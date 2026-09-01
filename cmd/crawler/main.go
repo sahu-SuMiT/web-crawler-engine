@@ -36,10 +36,29 @@ func main() {
 		}
 	}
 
+	defaultSeed := "https://books.toscrape.com"
+	if envSeed := os.Getenv("CRAWLER_SEED"); envSeed != "" {
+		defaultSeed = envSeed
+	}
+
+	defaultDepth := 3
+	if envDepth := os.Getenv("CRAWLER_DEPTH"); envDepth != "" {
+		if d, err := strconv.Atoi(envDepth); err == nil {
+			defaultDepth = d
+		}
+	}
+
+	defaultWorkers := 10
+	if envWorkers := os.Getenv("CRAWLER_WORKERS"); envWorkers != "" {
+		if w, err := strconv.Atoi(envWorkers); err == nil {
+			defaultWorkers = w
+		}
+	}
+
 	// 1. CLI Flags Configuration
-	seedURLFlag := flag.String("seed", "https://books.toscrape.com", "Seed URL to start crawling")
-	maxDepthFlag := flag.Int("depth", 3, "Maximum crawl depth limit")
-	workerCountFlag := flag.Int("workers", 10, "Number of concurrent fetcher workers")
+	seedURLFlag := flag.String("seed", defaultSeed, "Seed URL to start crawling")
+	maxDepthFlag := flag.Int("depth", defaultDepth, "Maximum crawl depth limit")
+	workerCountFlag := flag.Int("workers", defaultWorkers, "Number of concurrent fetcher workers")
 	portFlag := flag.Int("port", defaultPort, "Web dashboard HTTP port")
 	dataDirFlag := flag.String("data", "./data/pebble", "Pebble DB storage directory")
 	warcDirFlag := flag.String("warc", "./data/warc", "WARC archives storage directory")
@@ -70,7 +89,7 @@ func main() {
 
 	// 5. Initialize Politeness Rate Limiter & Robots.txt Compliance Engine
 	rateLimiter := politeness.NewRateLimiter(500 * time.Millisecond)
-	robotsEngine := politeness.NewRobotsEngine("SOTACrawler")
+	robotsEngine := politeness.NewRobotsEngine("WebCrawlerEngine")
 
 	// 6. Initialize Async HTTP Fetcher Engine
 	asyncFetcher := fetcher.NewAsyncFetcher(10*time.Second, "")
@@ -180,6 +199,7 @@ func main() {
 					}
 
 					if item.Depth > *maxDepthFlag {
+						_ = urlFrontier.MarkCompleted(item)
 						continue
 					}
 
@@ -264,15 +284,20 @@ func main() {
 	}
 
 	// 14. Graceful Shutdown Signal Listener
+	// The web server keeps running even after the crawl queue is exhausted.
+	// This is critical for cloud deployments (Render/Fly.io) where the health
+	// checker expects the HTTP server to stay alive permanently.
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	select {
-	case <-sigChan:
-		log.Println("\n🛑 Shutdown signal received. Closing crawler engine...")
-	}
+	log.Println("✅ Crawl queue running. Web dashboard alive at port", *portFlag)
+	log.Println("   Open /metrics for Prometheus telemetry.")
+
+	<-sigChan
+	log.Println("\n🛑 Shutdown signal received. Closing crawler engine...")
 
 	cancel()
+	wg.Wait()
 	_ = urlFrontier.Close()
 
 	// Upload WARC archive to Cloudflare R2 if enabled

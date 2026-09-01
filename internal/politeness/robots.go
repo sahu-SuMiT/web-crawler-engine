@@ -22,7 +22,7 @@ type RobotsEngine struct {
 // NewRobotsEngine initializes a Robots.txt compliance manager with in-memory domain caching.
 func NewRobotsEngine(userAgent string) *RobotsEngine {
 	if userAgent == "" {
-		userAgent = "SOTACrawler"
+		userAgent = "WebCrawlerEngine"
 	}
 
 	return &RobotsEngine{
