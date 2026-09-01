@@ -1,0 +1,20 @@
+# Secrets & environment
+.env
+
+# Git metadata
+.git
+.gitignore
+
+# Built binaries
+crawler
+*.exe
+*.dll
+
+# Local data output
+data/
+*.warc.gz
+
+# Documentation & IDE
+*.md
+.vscode/
+.idea/

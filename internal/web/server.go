@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sahu-SuMiT/web-crawler-engine/internal/domain"
 )
 
@@ -87,6 +88,8 @@ func (s *Server) BroadcastLog(urlStr string, status string, depth int) {
 
 // Start launches the HTTP web server in a background goroutine.
 func (s *Server) Start() error {
+	http.Handle("/metrics", promhttp.Handler())
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		indexBytes, err := staticFS.ReadFile("static/index.html")
 		if err != nil {

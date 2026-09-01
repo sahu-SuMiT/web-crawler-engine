@@ -1,0 +1,19 @@
+# Environment variable secrets
+.env
+
+# Binary output
+crawler
+*.exe
+*.exe;
+*.dll
+*.so
+*.dylib
+
+# Local data & storage output
+data/
+*.warc.gz
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
