@@ -1,7 +1,9 @@
 # ==========================================
 # STAGE 1: Build executable binary
 # ==========================================
-FROM golang:1.22-alpine AS builder
+FROM golang:alpine AS builder
+
+ENV GOTOOLCHAIN=auto
 
 # Install CA certificates for HTTPS/SSL support
 RUN apk add --no-cache git ca-certificates tzdata
