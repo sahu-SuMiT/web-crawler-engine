@@ -88,9 +88,11 @@ func (s *Server) BroadcastLog(urlStr string, status string, depth int) {
 
 // Start launches the HTTP web server in a background goroutine.
 func (s *Server) Start() error {
-	http.Handle("/metrics", promhttp.Handler())
+	mux := http.NewServeMux()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/metrics", promhttp.Handler())
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		indexBytes, err := staticFS.ReadFile("static/index.html")
 		if err != nil {
 			http.Error(w, "Index file not found", http.StatusInternalServerError)
@@ -100,7 +102,7 @@ func (s *Server) Start() error {
 		w.Write(indexBytes)
 	})
 
-	http.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
@@ -135,7 +137,7 @@ func (s *Server) Start() error {
 
 	addr := fmt.Sprintf(":%d", s.port)
 	go func() {
-		if err := http.ListenAndServe(addr, nil); err != nil {
+		if err := http.ListenAndServe(addr, mux); err != nil {
 			fmt.Printf("[Web Server] Error: %v\n", err)
 		}
 	}()

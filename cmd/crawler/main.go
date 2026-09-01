@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"sync"
 	"sync/atomic"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -28,11 +29,18 @@ func main() {
 	// 0. Load .env file if present
 	_ = godotenv.Load()
 
+	defaultPort := 8080
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		if p, err := strconv.Atoi(envPort); err == nil {
+			defaultPort = p
+		}
+	}
+
 	// 1. CLI Flags Configuration
 	seedURLFlag := flag.String("seed", "https://books.toscrape.com", "Seed URL to start crawling")
 	maxDepthFlag := flag.Int("depth", 3, "Maximum crawl depth limit")
 	workerCountFlag := flag.Int("workers", 10, "Number of concurrent fetcher workers")
-	portFlag := flag.Int("port", 8080, "Web dashboard HTTP port")
+	portFlag := flag.Int("port", defaultPort, "Web dashboard HTTP port")
 	dataDirFlag := flag.String("data", "./data/pebble", "Pebble DB storage directory")
 	warcDirFlag := flag.String("warc", "./data/warc", "WARC archives storage directory")
 	flag.Parse()
