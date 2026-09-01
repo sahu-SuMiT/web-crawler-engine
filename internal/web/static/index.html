@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOTA Web Crawler Engine | Live Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .glass { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+  <div class="max-w-7xl mx-auto p-6 space-y-6">
+    
+    <!-- Header -->
+    <header class="flex items-center justify-between glass p-6 rounded-2xl">
+      <div>
+        <h1 class="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+          SOTA Web Crawler Engine
+        </h1>
+        <p class="text-slate-400 text-sm mt-1">High-Throughput Go Event-Driven Crawling Architecture</p>
+      </div>
+      <div class="flex items-center space-x-3">
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span class="w-2 h-2 mr-2 bg-emerald-400 rounded-full animate-ping"></span> Live Engine Active
+        </span>
+      </div>
+    </header>
+
+    <!-- Metrics Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="glass p-5 rounded-2xl">
+        <span class="text-slate-400 text-xs font-medium uppercase tracking-wider">Pages Crawled</span>
+        <div id="metric-crawled" class="text-3xl font-black text-blue-400 mt-2">0</div>
+      </div>
+      <div class="glass p-5 rounded-2xl">
+        <span class="text-slate-400 text-xs font-medium uppercase tracking-wider">Queue Backlog</span>
+        <div id="metric-queued" class="text-3xl font-black text-indigo-400 mt-2">0</div>
+      </div>
+      <div class="glass p-5 rounded-2xl">
+        <span class="text-slate-400 text-xs font-medium uppercase tracking-wider">Active Workers</span>
+        <div id="metric-workers" class="text-3xl font-black text-emerald-400 mt-2">0</div>
+      </div>
+      <div class="glass p-5 rounded-2xl">
+        <span class="text-slate-400 text-xs font-medium uppercase tracking-wider">Errors</span>
+        <div id="metric-errors" class="text-3xl font-black text-rose-400 mt-2">0</div>
+      </div>
+    </div>
+
+    <!-- Live Event Log -->
+    <div class="glass p-6 rounded-2xl">
+      <h2 class="text-lg font-bold text-slate-200 mb-4 flex items-center justify-between">
+        <span>Live Crawl Stream</span>
+        <span class="text-xs text-slate-400 font-mono" id="warc-file">WARC: Local Mode</span>
+      </h2>
+      <div id="log-container" class="bg-slate-900/90 rounded-xl p-4 h-96 overflow-y-auto font-mono text-xs space-y-2 border border-slate-800">
+        <div class="text-slate-500">[System] Initializing crawler engine... Connect to SSE stream.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const logContainer = document.getElementById('log-container');
+    const evtSource = new EventSource('/events');
+
+    evtSource.onmessage = function(event) {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'stats') {
+        document.getElementById('metric-crawled').textContent = data.total_crawled || 0;
+        document.getElementById('metric-queued').textContent = data.total_queued || 0;
+        document.getElementById('metric-workers').textContent = data.active_workers || 0;
+        document.getElementById('metric-errors').textContent = data.total_errors || 0;
+      } else if (data.type === 'log') {
+        const div = document.createElement('div');
+        div.className = data.status === '200' ? 'text-emerald-400' : (data.status === 'ERROR' ? 'text-rose-400' : 'text-blue-300');
+        div.textContent = `[${data.time}] HTTP ${data.status} | Depth: ${data.depth} | ${data.url}`;
+        logContainer.prepend(div);
+        if (logContainer.children.length > 200) {
+          logContainer.removeChild(logContainer.lastChild);
+        }
+      }
+    };
+  </script>
+</body>
+</html>
