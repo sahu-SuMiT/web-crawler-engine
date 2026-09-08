@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sahu-SuMiT/web-crawler-engine/internal/domain"
+	"github.com/sahu-SuMiT/web-crawler-engine/internal/frontier"
 )
 
 //go:embed static/*
@@ -21,6 +24,7 @@ type Server struct {
 	clients   map[chan string]bool
 	mu        sync.Mutex
 	broadcast chan string
+	frontier  *frontier.Frontier
 }
 
 // NewServer creates a new web dashboard server instance.
@@ -37,6 +41,11 @@ func NewServer(port int) *Server {
 
 	go s.listenBroadcast()
 	return s
+}
+
+// SetFrontier attaches the Frontier instance for interactive URL submission.
+func (s *Server) SetFrontier(f *frontier.Frontier) {
+	s.frontier = f
 }
 
 // listenBroadcast distributes messages to all active SSE subscribers.
@@ -86,11 +95,93 @@ func (s *Server) BroadcastLog(urlStr string, status string, depth int) {
 	}
 }
 
+type crawlReqPayload struct {
+	URL     string `json:"url"`
+	Depth   int    `json:"depth"`
+	Workers int    `json:"workers"`
+}
+
 // Start launches the HTTP web server in a background goroutine.
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
 
 	mux.Handle("/metrics", promhttp.Handler())
+
+	mux.HandleFunc("/api/crawl", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var payload crawlReqPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
+		rawURL := strings.TrimSpace(payload.URL)
+		if rawURL == "" {
+			http.Error(w, "URL is required", http.StatusBadRequest)
+			return
+		}
+
+		if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
+			rawURL = "https://" + rawURL
+		}
+
+		parsed, err := url.Parse(rawURL)
+		if err != nil || parsed.Hostname() == "" {
+			http.Error(w, "Invalid URL format", http.StatusBadRequest)
+			return
+		}
+
+		if s.frontier == nil {
+			http.Error(w, "Frontier engine not connected", http.StatusInternalServerError)
+			return
+		}
+
+		depth := payload.Depth
+		if depth <= 0 {
+			depth = 3
+		}
+
+		item := domain.URLItem{
+			URL:      rawURL,
+			Domain:   parsed.Hostname(),
+			Depth:    1,
+			Priority: 1,
+			Status:   domain.StatusQueued,
+			AddedAt:  time.Now(),
+		}
+
+		// Reset deduplicator for a new crawl session if frontier is fully idle
+		if s.frontier.IsIdle() {
+			s.frontier.ResetDeduplicator()
+		}
+
+		pushed, err := s.frontier.Push(item)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to queue URL: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if !pushed {
+			s.BroadcastLog(rawURL, "ALREADY IN FRONTIER", 1)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"message": "URL already crawled or queued in frontier",
+			})
+			return
+		}
+
+		s.BroadcastLog(rawURL, "QUEUED", 1)
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": fmt.Sprintf("Seed URL queued: %s (Depth: %d)", rawURL, depth),
+		})
+	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		indexBytes, err := staticFS.ReadFile("static/index.html")

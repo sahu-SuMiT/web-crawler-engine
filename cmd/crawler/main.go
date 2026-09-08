@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"sync/atomic"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -26,36 +26,29 @@ import (
 )
 
 func main() {
-	// 0. Load .env file if present
 	_ = godotenv.Load()
-
 	defaultPort := 8080
 	if envPort := os.Getenv("PORT"); envPort != "" {
 		if p, err := strconv.Atoi(envPort); err == nil {
 			defaultPort = p
 		}
 	}
-
-	defaultSeed := "https://books.toscrape.com"
+	defaultSeed := ""
 	if envSeed := os.Getenv("CRAWLER_SEED"); envSeed != "" {
 		defaultSeed = envSeed
 	}
-
 	defaultDepth := 3
 	if envDepth := os.Getenv("CRAWLER_DEPTH"); envDepth != "" {
 		if d, err := strconv.Atoi(envDepth); err == nil {
 			defaultDepth = d
 		}
 	}
-
 	defaultWorkers := 10
 	if envWorkers := os.Getenv("CRAWLER_WORKERS"); envWorkers != "" {
 		if w, err := strconv.Atoi(envWorkers); err == nil {
 			defaultWorkers = w
 		}
 	}
-
-	// 1. CLI Flags Configuration
 	seedURLFlag := flag.String("seed", defaultSeed, "Seed URL to start crawling")
 	maxDepthFlag := flag.Int("depth", defaultDepth, "Maximum crawl depth limit")
 	workerCountFlag := flag.Int("workers", defaultWorkers, "Number of concurrent fetcher workers")
@@ -65,39 +58,31 @@ func main() {
 	flag.Parse()
 
 	log.Println("==========================================================")
-	log.Printf("🚀 Starting Web Crawler Engine")
-	log.Printf("📍 Seed URL    : %s", *seedURLFlag)
-	log.Printf("📊 Max Depth   : %d", *maxDepthFlag)
-	log.Printf("⚡ Workers     : %d", *workerCountFlag)
-	log.Printf("🌐 Dashboard   : http://localhost:%d", *portFlag)
+	log.Printf("Engine started...")
+	if *seedURLFlag != "" {
+		log.Printf("Seed URL: %s", *seedURLFlag)
+	} else {
+		log.Printf("Mode    : IDLE (Awaiting seed URL via Web Dashboard)")
+	}
+	log.Printf("Max Depth   : %d", *maxDepthFlag)
+	log.Printf("Workers     : %d", *workerCountFlag)
+	log.Printf("Dashboard   : http://localhost:%d", *portFlag)
 	log.Println("==========================================================")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// 2. Initialize Pebble DB Persistent Frontier Queue
 	pebbleStore, err := frontier.NewPebbleStore(*dataDirFlag)
 	if err != nil {
 		log.Fatalf("Fatal: Failed to initialize Pebble DB: %v", err)
 	}
 
-	// 3. Initialize In-Memory Bloom Filter Deduplicator (1M items estimate, 1% false positive rate)
 	bloomFilter := parser.NewBloomDeduplicator(1000000, 0.01)
-
-	// 4. Initialize Frontier Manager
 	urlFrontier := frontier.NewFrontier(pebbleStore, bloomFilter, 50000)
-
-	// 5. Initialize Politeness Rate Limiter & Robots.txt Compliance Engine
 	rateLimiter := politeness.NewRateLimiter(500 * time.Millisecond)
 	robotsEngine := politeness.NewRobotsEngine("WebCrawlerEngine")
-
-	// 6. Initialize Async HTTP Fetcher Engine
 	asyncFetcher := fetcher.NewAsyncFetcher(10*time.Second, "")
-
-	// 7. Initialize HTML Parser & Link Extractor
 	htmlParser := parser.NewHTMLParser()
-
-	// 8. Initialize Local WARC Exporter & Cloudflare R2 Cloud Storage
 	warcWriter, err := storage.NewWARCWriter(*warcDirFlag)
 	if err != nil {
 		log.Fatalf("Fatal: Failed to initialize WARC Exporter: %v", err)
@@ -111,10 +96,9 @@ func main() {
 	if r2Storage != nil && r2Storage.IsEnabled() {
 		log.Println("☁️ Cloudflare R2 Object Storage: CONNECTED & ACTIVE")
 	} else {
-		log.Println("ℹ️ Cloudflare R2 Object Storage: LOCAL MODE (Set R2_ACCOUNT_ID to enable cloud uploads)")
+		log.Println("Cloudflare R2 Object Storage: LOCAL MODE")
 	}
 
-	// 9. Initialize Neon PostgreSQL Metadata Store
 	neonStore, err := storage.NewNeonMetadataStore(ctx, "")
 	if err != nil {
 		log.Printf("Warning: Failed to initialize Neon PostgreSQL: %v", err)
@@ -122,43 +106,45 @@ func main() {
 		log.Println("🐘 Neon PostgreSQL Metadata Store: CONNECTED & ACTIVE")
 		defer neonStore.Close()
 	} else {
-		log.Println("ℹ️ Neon PostgreSQL Metadata Store: LOCAL MODE (Set NEON_DATABASE_URL to enable cloud metadata sync)")
+		log.Println("Neon PostgreSQL Metadata Store: LOCAL MODE")
 	}
 
-	log.Printf("📦 WARC Archive initialized at: %s", warcWriter.FilePath())
+	log.Printf("WARC Archive initialized at: %s", warcWriter.FilePath())
 
-	// 10. Start Embedded Web UI Server
 	webServer := web.NewServer(*portFlag)
+	webServer.SetFrontier(urlFrontier)
 	if err := webServer.Start(); err != nil {
 		log.Printf("Warning: Failed to start web dashboard: %v", err)
 	}
 
-	// 11. Push Seed URL into Frontier Queue
-	seedParsed, err := url.Parse(*seedURLFlag)
-	if err != nil {
-		log.Fatalf("Fatal: Invalid seed URL: %v", err)
+	if *seedURLFlag != "" {
+		seedParsed, err := url.Parse(*seedURLFlag)
+		if err != nil {
+			log.Fatalf("Fatal: Invalid seed URL: %v", err)
+		}
+
+		seedItem := domain.URLItem{
+			URL:      *seedURLFlag,
+			Domain:   seedParsed.Hostname(),
+			Depth:    1,
+			Priority: 1,
+			Status:   domain.StatusQueued,
+			AddedAt:  time.Now(),
+		}
+
+		if pushed, err := urlFrontier.Push(seedItem); err != nil || !pushed {
+			log.Printf("Warning: Seed URL already processed or queued: %v", err)
+		}
 	}
 
-	seedItem := domain.URLItem{
-		URL:        *seedURLFlag,
-		Domain:     seedParsed.Hostname(),
-		Depth:      1,
-		Priority:   1,
-		Status:     domain.StatusQueued,
-		AddedAt:    time.Now(),
-	}
-
-	if pushed, err := urlFrontier.Push(seedItem); err != nil || !pushed {
-		log.Fatalf("Fatal: Failed to push seed URL to frontier: %v", err)
-	}
-
-	// Metrics counters
 	var activeWorkers int32
 	var totalErrors uint64
 
-	// 12. Periodic Telemetry Broadcast Goroutine
+	var crawlWasActive bool
+	var finishedBroadcasted bool
+
 	go func() {
-		ticker := time.NewTicker(1 * time.Second)
+		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
 
 		for {
@@ -177,11 +163,19 @@ func main() {
 					TotalErrors:   atomic.LoadUint64(&totalErrors),
 				}
 				webServer.BroadcastStats(stats)
+
+				if workers > 0 || queueLen > 0 {
+					crawlWasActive = true
+					finishedBroadcasted = false
+				} else if crawlWasActive && !finishedBroadcasted && urlFrontier.IsIdle() {
+					webServer.BroadcastLog("", "SUCCESS", 0)
+					finishedBroadcasted = true
+					crawlWasActive = false
+				}
 			}
 		}
 	}()
 
-	// 13. Spawn Worker Pool
 	var wg sync.WaitGroup
 	for i := 1; i <= *workerCountFlag; i++ {
 		wg.Add(1)
@@ -198,18 +192,22 @@ func main() {
 						return
 					}
 
+					urlFrontier.MarkInFlight()
+					atomic.AddInt32(&activeWorkers, 1)
+
 					if item.Depth > *maxDepthFlag {
 						_ = urlFrontier.MarkCompleted(item)
+						atomic.AddInt32(&activeWorkers, -1)
 						continue
 					}
 
-					// A. Check Robots.txt Compliance Policy
 					allowed, crawlDelay := robotsEngine.IsAllowed(item.URL)
 					if !allowed {
-						log.Printf("[Worker %2d] 🛑 SKIPPED (Robots.txt Disallowed) | %s", id, item.URL)
+						log.Printf("[Worker %2d] -- SKIPPED (Robots.txt Disallowed) | %s", id, item.URL)
 						webServer.BroadcastLog(item.URL, "BLOCKED", item.Depth)
 						telemetry.RecordRobotsBlock()
 						_ = urlFrontier.MarkCompleted(item)
+						atomic.AddInt32(&activeWorkers, -1)
 						continue
 					}
 
@@ -217,15 +215,9 @@ func main() {
 						time.Sleep(crawlDelay)
 					}
 
-					atomic.AddInt32(&activeWorkers, 1)
-
-					// B. Enforce Politeness Rate Limiting per Domain
 					_ = rateLimiter.Wait(ctx, item.Domain)
 
-					// C. Fetch Page Asynchronously via fasthttp
 					res := asyncFetcher.Fetch(ctx, item)
-
-					atomic.AddInt32(&activeWorkers, -1)
 					telemetry.RecordFetch(res.StatusCode, len(res.Body), res.FetchTime)
 
 					if res.Error != "" || res.StatusCode >= 400 {
@@ -237,23 +229,22 @@ func main() {
 						if neonStore != nil && neonStore.IsEnabled() {
 							_ = neonStore.SaveRecord(ctx, res)
 						}
+						_ = urlFrontier.MarkCompleted(item)
+						atomic.AddInt32(&activeWorkers, -1)
 						continue
 					}
 
-					log.Printf("[Worker %2d] ✅ HTTP 200 | Depth: %d | Links: %d | Latency: %v | %s",
+					log.Printf("[Worker %2d] HTTP 200 |Depth: %d |Links: %d |Latency: %v | %s",
 						id, item.Depth, len(res.OutboundURLs), res.FetchTime, item.URL)
 
 					webServer.BroadcastLog(item.URL, fmt.Sprintf("%d", res.StatusCode), item.Depth)
 
-					// D. Sync Metadata to Neon PostgreSQL Cloud DB
 					if neonStore != nil && neonStore.IsEnabled() {
 						_ = neonStore.SaveRecord(ctx, res)
 					}
 
-					// E. Write Response Payload to WARC Archive
 					_ = warcWriter.WriteRecord(res)
 
-					// F. Extract Links and Canonicalize Outbound URLs
 					if item.Depth < *maxDepthFlag && len(res.Body) > 0 {
 						links, err := htmlParser.ExtractLinks(res.Body, res.URL)
 						if err == nil {
@@ -276,40 +267,35 @@ func main() {
 						}
 					}
 
-					// G. Mark URL Completed in Pebble DB
 					_ = urlFrontier.MarkCompleted(item)
+					atomic.AddInt32(&activeWorkers, -1)
 				}
 			}
 		}(workerID)
 	}
 
-	// 14. Graceful Shutdown Signal Listener
-	// The web server keeps running even after the crawl queue is exhausted.
-	// This is critical for cloud deployments (Render/Fly.io) where the health
-	// checker expects the HTTP server to stay alive permanently.
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Println("✅ Crawl queue running. Web dashboard alive at port", *portFlag)
-	log.Println("   Open /metrics for Prometheus telemetry.")
+	log.Println("Crawler running. Web dashboard alive at port", *portFlag)
+	log.Println("Open /metrics for Prometheus telemetry.")
 
 	<-sigChan
-	log.Println("\n🛑 Shutdown signal received. Closing crawler engine...")
+	log.Println("\n🛑 Shutdown signal received...")
 
 	cancel()
 	wg.Wait()
 	_ = urlFrontier.Close()
 
-	// Upload WARC archive to Cloudflare R2 if enabled
 	if r2Storage != nil && r2Storage.IsEnabled() {
 		log.Println("☁️ Uploading WARC archive to Cloudflare R2...")
 		remoteURI, err := r2Storage.UploadWARC(context.Background(), warcWriter.FilePath())
 		if err != nil {
-			log.Printf("Warning: Failed to upload WARC to Cloudflare R2: %v", err)
+			log.Printf("!!! Warning: Failed to upload WARC to Cloudflare R2: %v", err)
 		} else {
-			log.Printf("✅ WARC Archive successfully uploaded to Cloudflare R2: %s", remoteURI)
+			log.Printf("WARC Archive successfully uploaded to Cloudflare R2: %s", remoteURI)
 		}
 	}
 
-	log.Println("✨ Crawler engine stopped cleanly.")
+	log.Println("✨ Engine stopped gracefully.")
 }

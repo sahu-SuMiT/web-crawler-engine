@@ -1,31 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Web Crawler Engine | Live Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .glass { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+    .glass {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover, 
+    input:-webkit-autofill:focus, 
+    input:-webkit-autofill:active {
+      -webkit-box-shadow: 0 0 0 30px #0f172a inset !important;
+      -webkit-text-fill-color: #f8fafc !important;
+      transition: background-color 5000s ease-in-out 0s;
+    }
   </style>
 </head>
+
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
   <div class="max-w-7xl mx-auto p-6 space-y-6">
-    
+
     <!-- Header -->
     <header class="flex items-center justify-between glass p-6 rounded-2xl">
       <div>
         <h1 class="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
           Web Crawler Engine
         </h1>
-        <p class="text-slate-400 text-sm mt-1">High-Throughput Go Event-Driven Crawling Architecture</p>
+        <p class="text-slate-400 text-sm mt-1">Golang Event-Driven Crawler Engine</p>
       </div>
       <div class="flex items-center space-x-3">
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <span class="w-2 h-2 mr-2 bg-emerald-400 rounded-full animate-ping"></span> Live Engine Active
+        <span
+          class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span class="w-2 h-2 mr-2 bg-emerald-400 rounded-full animate-ping"></span> Live Engine
         </span>
       </div>
     </header>
+
+    <!-- Seed Control Bar -->
+    <div class="glass p-6 rounded-2xl">
+      <form id="crawl-form" class="flex flex-col md:flex-row items-center gap-4">
+        <div class="flex-1 w-full">
+          <label for="url-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Target
+            URL</label>
+          <input type="url" id="url-input" placeholder="https://books.toscrape.com" required
+            autocomplete="url" autocapitalize="none" spellcheck="false"
+            class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-sm select-text">
+        </div>
+        <div class="w-full md:w-32">
+          <label for="depth-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Max
+            Depth</label>
+          <select id="depth-input"
+            class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-3 text-slate-100 focus:outline-none focus:border-blue-500 text-sm font-mono">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <div class="w-full md:w-32">
+          <label for="workers-input"
+            class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Workers</label>
+          <select id="workers-input"
+            class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-3 text-slate-100 focus:outline-none focus:border-blue-500 text-sm font-mono">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50" class="text-rose-400 font-semibold bg-slate-900">50</option>
+            <option value="100" class="text-rose-400 font-semibold bg-slate-900">100</option>
+          </select>
+        </div>
+        <div class="w-full md:w-auto self-end mt-2 md:mt-0">
+          <button type="submit" id="submit-btn"
+            class="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition duration-200 flex items-center justify-center">
+            <span>Start</span>
+          </button>
+        </div>
+      </form>
+    </div>
 
     <!-- Metrics Grid -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -50,11 +108,11 @@
     <!-- Live Event Log -->
     <div class="glass p-6 rounded-2xl">
       <h2 class="text-lg font-bold text-slate-200 mb-4 flex items-center justify-between">
-        <span>Live Crawl Stream</span>
-        <span class="text-xs text-slate-400 font-mono" id="warc-file">WARC: Local Mode</span>
+        <span class="text-xs text-slate-400 font-mono" id="warc-file">Terminal</span>
       </h2>
-      <div id="log-container" class="bg-slate-900/90 rounded-xl p-4 h-96 overflow-y-auto font-mono text-xs space-y-2 border border-slate-800">
-        <div class="text-slate-500">[System] Initializing crawler engine... Connect to SSE stream.</div>
+      <div id="log-container"
+        class="bg-slate-900/90 rounded-xl p-4 h-96 overflow-y-auto font-mono text-xs space-y-2 border border-slate-800">
+        <div class="text-slate-500">[System] Enter a target URL to see live log.</div>
       </div>
     </div>
 
@@ -64,7 +122,7 @@
     const logContainer = document.getElementById('log-container');
     const evtSource = new EventSource('/events');
 
-    evtSource.onmessage = function(event) {
+    evtSource.onmessage = function (event) {
       const data = JSON.parse(event.data);
 
       if (data.type === 'stats') {
@@ -74,14 +132,50 @@
         document.getElementById('metric-errors').textContent = data.total_errors || 0;
       } else if (data.type === 'log') {
         const div = document.createElement('div');
-        div.className = data.status === '200' ? 'text-emerald-400' : (data.status === 'ERROR' ? 'text-rose-400' : 'text-blue-300');
-        div.textContent = `[${data.time}] HTTP ${data.status} | Depth: ${data.depth} | ${data.url}`;
-        logContainer.prepend(div);
-        if (logContainer.children.length > 200) {
-          logContainer.removeChild(logContainer.lastChild);
+        if (data.status === 'SUCCESS' || data.status === 'success') {
+          div.className = 'text-emerald-400 font-bold';
+          div.textContent = 'success';
+        } else if (data.status === 'ALREADY IN FRONTIER' || data.status === 'ALREADY QUEUED') {
+          div.className = 'text-amber-400 font-semibold';
+          div.textContent = `[${data.time}] HTTP ${data.status} | Depth:${data.depth} | ${data.url}`;
+        } else {
+          div.className = data.status === '200' ? 'text-emerald-400' : (data.status === 'ERROR' ? 'text-rose-400' : 'text-blue-300');
+          div.textContent = `[${data.time}] HTTP ${data.status} | Depth:${data.depth} | ${data.url}`;
         }
+        logContainer.appendChild(div);
+        if (logContainer.children.length > 200) {
+          logContainer.removeChild(logContainer.firstChild);
+        }
+        logContainer.scrollTop = logContainer.scrollHeight;
       }
     };
+
+    document.getElementById('crawl-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const urlInput = document.getElementById('url-input').value.trim();
+      const depthInput = parseInt(document.getElementById('depth-input').value, 10);
+      const workersInput = parseInt(document.getElementById('workers-input').value, 10);
+      const submitBtn = document.getElementById('submit-btn');
+
+      if (!urlInput) return;
+
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50');
+
+      try {
+        await fetch('/api/crawl', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: urlInput, depth: depthInput, workers: workersInput })
+        });
+      } catch (err) {
+        console.error('Crawl request failed:', err);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50');
+      }
+    });
   </script>
 </body>
+
 </html>

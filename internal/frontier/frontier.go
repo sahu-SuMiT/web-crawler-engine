@@ -17,6 +17,7 @@ type Frontier struct {
 	queue        chan domain.URLItem
 	totalPushed  uint64
 	totalCrawled uint64
+	inFlight     int64 // items dequeued by workers but not yet completed
 }
 
 // NewFrontier initializes a URL Frontier queue with a Pebble storage backend and Bloom Filter.
@@ -32,6 +33,25 @@ func NewFrontier(store *PebbleStore, bloom *parser.BloomDeduplicator, bufferSize
 	}
 }
 
+// ResetDeduplicator resets the in-memory Bloom filter for a fresh crawl session.
+func (f *Frontier) ResetDeduplicator() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.bloom = parser.NewBloomDeduplicator(1000000, 0.01)
+}
+
+// IsIdle returns true only when both the channel queue and all in-flight worker
+// items are fully drained. Use this to determine if a crawl session has finished.
+func (f *Frontier) IsIdle() bool {
+	return len(f.queue) == 0 && atomic.LoadInt64(&f.inFlight) == 0
+}
+
+// MarkInFlight signals that a worker has dequeued an item and is processing it.
+// Call this immediately after receiving from Channel().
+func (f *Frontier) MarkInFlight() {
+	atomic.AddInt64(&f.inFlight, 1)
+}
+
 // Push adds a URLItem to the frontier if it hasn't been seen before.
 // Returns true if the URL was accepted and queued, false if it was a duplicate.
 func (f *Frontier) Push(item domain.URLItem) (bool, error) {
@@ -40,7 +60,11 @@ func (f *Frontier) Push(item domain.URLItem) (bool, error) {
 	}
 
 	// 1. Fast in-memory Bloom filter deduplication check
-	if !f.bloom.Add(item.URL) {
+	f.mu.Lock()
+	added := f.bloom.Add(item.URL)
+	f.mu.Unlock()
+
+	if !added {
 		return false, nil // Already seen
 	}
 
@@ -68,7 +92,9 @@ func (f *Frontier) Channel() <-chan domain.URLItem {
 }
 
 // MarkCompleted marks a URL as crawled in Pebble DB and increments progress counters.
+// Must be called after MarkInFlight() to correctly track idle state.
 func (f *Frontier) MarkCompleted(item domain.URLItem) error {
+	atomic.AddInt64(&f.inFlight, -1)
 	item.Status = domain.StatusCrawled
 	atomic.AddUint64(&f.totalCrawled, 1)
 	return f.store.SaveURL(item)
@@ -84,7 +110,7 @@ func (f *Frontier) TotalCrawled() uint64 {
 	return atomic.LoadUint64(&f.totalCrawled)
 }
 
-// QueueLength returns the current number of in-flight items in the Go channel.
+// QueueLength returns the current number of pending items in the Go channel buffer.
 func (f *Frontier) QueueLength() int {
 	return len(f.queue)
 }
