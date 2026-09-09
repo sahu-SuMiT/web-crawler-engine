@@ -109,10 +109,11 @@ func main() {
 		log.Println("Neon PostgreSQL Metadata Store: LOCAL MODE")
 	}
 
-	log.Printf("WARC Archive initialized at: %s", warcWriter.FilePath())
+	log.Println("WARC Archive initialized (Dynamic multi-domain storage)")
 
 	webServer := web.NewServer(*portFlag)
 	webServer.SetFrontier(urlFrontier)
+	webServer.SetWARCDir(*warcDirFlag)
 	if err := webServer.Start(); err != nil {
 		log.Printf("Warning: Failed to start web dashboard: %v", err)
 	}
@@ -288,12 +289,14 @@ func main() {
 	_ = urlFrontier.Close()
 
 	if r2Storage != nil && r2Storage.IsEnabled() {
-		log.Println("☁️ Uploading WARC archive to Cloudflare R2...")
-		remoteURI, err := r2Storage.UploadWARC(context.Background(), warcWriter.FilePath())
-		if err != nil {
-			log.Printf("!!! Warning: Failed to upload WARC to Cloudflare R2: %v", err)
-		} else {
-			log.Printf("WARC Archive successfully uploaded to Cloudflare R2: %s", remoteURI)
+		log.Println("☁️ Uploading WARC archives to Cloudflare R2...")
+		for _, fp := range warcWriter.FilePaths() {
+			remoteURI, err := r2Storage.UploadWARC(context.Background(), fp)
+			if err != nil {
+				log.Printf("!!! Warning: Failed to upload WARC %s to Cloudflare R2: %v", fp, err)
+			} else {
+				log.Printf("WARC Archive successfully uploaded to Cloudflare R2: %s", remoteURI)
+			}
 		}
 	}
 

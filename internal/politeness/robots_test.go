@@ -8,11 +8,11 @@ import (
 
 func TestRobotsTxtParsing(t *testing.T) {
 	robotsContent := `
-User-agent: *
-Disallow: /admin/
-Disallow: /private/
-Crawl-delay: 2
-`
+					User-agent: *
+					Disallow: /admin/
+					Disallow: /private/
+					Crawl-delay: 2
+					`
 
 	data, err := robotstxt.FromStatusAndBytes(200, []byte(robotsContent))
 	if err != nil {

@@ -1,11 +1,17 @@
 package web
 
 import (
+	"bufio"
+	"compress/gzip"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +31,7 @@ type Server struct {
 	mu        sync.Mutex
 	broadcast chan string
 	frontier  *frontier.Frontier
+	warcDir   string
 }
 
 // NewServer creates a new web dashboard server instance.
@@ -46,6 +53,10 @@ func NewServer(port int) *Server {
 // SetFrontier attaches the Frontier instance for interactive URL submission.
 func (s *Server) SetFrontier(f *frontier.Frontier) {
 	s.frontier = f
+}
+
+func (s *Server) SetWARCDir(dir string) {
+	s.warcDir = dir
 }
 
 // listenBroadcast distributes messages to all active SSE subscribers.
@@ -106,6 +117,159 @@ func (s *Server) Start() error {
 	mux := http.NewServeMux()
 
 	mux.Handle("/metrics", promhttp.Handler())
+
+	mux.HandleFunc("/api/data", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		statusFilter := r.URL.Query().Get("status")
+
+		type WARCFile struct {
+			Name    string `json:"name"`
+			SizeMB  string `json:"size_mb"`
+			ModTime string `json:"mod_time"`
+		}
+		type WARCDomain struct {
+			Domain string     `json:"domain"`
+			Files  []WARCFile `json:"files"`
+		}
+
+		var warcGroups []WARCDomain
+		if s.warcDir != "" {
+			domainEntries, _ := os.ReadDir(s.warcDir)
+			for _, de := range domainEntries {
+				if !de.IsDir() {
+					continue
+				}
+				domainPath := filepath.Join(s.warcDir, de.Name())
+				fileEntries, _ := os.ReadDir(domainPath)
+				var files []WARCFile
+				for _, fe := range fileEntries {
+					if fe.IsDir() {
+						continue
+					}
+					info, err := fe.Info()
+					if err != nil {
+						continue
+					}
+					files = append(files, WARCFile{
+						Name:    fe.Name(),
+						SizeMB:  fmt.Sprintf("%.2f MB", float64(info.Size())/1024/1024),
+						ModTime: info.ModTime().Format("2006-01-02 15:04:05"),
+					})
+				}
+				// Always add the directory to show empty folders (like 'unsorted')
+				if files == nil {
+					files = []WARCFile{}
+				}
+				warcGroups = append(warcGroups, WARCDomain{
+					Domain: de.Name(),
+					Files:  files,
+				})
+			}
+		}
+
+		// Pebble: return only domain summaries (count per domain), no individual URLs.
+		// URLs are loaded on-demand via /api/pebble?domain=X
+		type PebbleDomainSummary struct {
+			Domain string `json:"domain"`
+			Count  int    `json:"count"`
+		}
+		var pebbleSummary []PebbleDomainSummary
+		if s.frontier != nil {
+			counts, err := s.frontier.GetStore().ScanDomains(statusFilter)
+			if err == nil {
+				domains := make([]string, 0, len(counts))
+				for d := range counts {
+					domains = append(domains, d)
+				}
+				sort.Strings(domains)
+				for _, d := range domains {
+					pebbleSummary = append(pebbleSummary, PebbleDomainSummary{
+						Domain: d,
+						Count:  counts[d],
+					})
+				}
+			}
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"pebble_domains": pebbleSummary,
+			"warc_domains":   warcGroups,
+		})
+	})
+
+	// On-demand URL loader: called when user expands a domain folder in the sidebar.
+	mux.HandleFunc("/api/pebble", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		domainName := r.URL.Query().Get("domain")
+		if domainName == "" {
+			http.Error(w, "domain param required", http.StatusBadRequest)
+			return
+		}
+		statusFilter := r.URL.Query().Get("status")
+		limit := 200
+		if n, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && n > 0 && n <= 2000 {
+			limit = n
+		}
+
+		var records []domain.URLItem
+		if s.frontier != nil {
+			records, _ = s.frontier.GetStore().ScanByDomain(domainName, statusFilter, limit)
+		}
+		if records == nil {
+			records = []domain.URLItem{}
+		}
+		json.NewEncoder(w).Encode(records)
+	})
+
+
+	mux.HandleFunc("/api/warc-preview", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		domainName := filepath.Base(r.URL.Query().Get("domain"))
+		fileName := filepath.Base(r.URL.Query().Get("file"))
+		if fileName == "" || fileName == "." {
+			http.Error(w, "file param required", http.StatusBadRequest)
+			return
+		}
+
+		nLines := 100
+		if n, err := strconv.Atoi(r.URL.Query().Get("lines")); err == nil && n > 0 && n <= 2000 {
+			nLines = n
+		}
+
+		var filePath string
+		if domainName != "" && domainName != "." {
+			filePath = filepath.Join(s.warcDir, domainName, fileName)
+		} else {
+			filePath = filepath.Join(s.warcDir, fileName)
+		}
+		f, err := os.Open(filePath)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("cannot open file: %v", err), http.StatusNotFound)
+			return
+		}
+		defer f.Close()
+
+		gr, err := gzip.NewReader(f)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("not a valid gzip file: %v", err), http.StatusBadRequest)
+			return
+		}
+		defer gr.Close()
+
+		scanner := bufio.NewScanner(gr)
+		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+		count := 0
+		for scanner.Scan() && count < nLines {
+			fmt.Fprintln(w, scanner.Text())
+			count++
+		}
+	})
 
 	mux.HandleFunc("/api/crawl", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -180,6 +344,54 @@ func (s *Server) Start() error {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 			"message": fmt.Sprintf("Seed URL queued: %s (Depth: %d)", rawURL, depth),
+		})
+	})
+
+	// Erase Disk — deletes all Pebble DB data and WARC files.
+	// Only allowed when the engine is idle (no active workers).
+	mux.HandleFunc("/api/erase-disk", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		var warcDeleted int
+
+		// Erase Pebble DB
+		if s.frontier != nil {
+			if err := s.frontier.GetStore().EraseAll(); err != nil {
+				http.Error(w, fmt.Sprintf("pebble erase failed: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Erase WARC files — remove every subdirectory under warcDir
+		if s.warcDir != "" {
+			entries, _ := os.ReadDir(s.warcDir)
+			for _, e := range entries {
+				// Skip the fallback storage directory
+				if e.IsDir() && e.Name() == "unsorted" {
+					continue
+				}
+				path := filepath.Join(s.warcDir, e.Name())
+				if e.IsDir() {
+					// Count .warc.gz files before deleting
+					files, _ := os.ReadDir(path)
+					warcDeleted += len(files)
+					os.RemoveAll(path)
+				} else {
+					warcDeleted++
+					os.Remove(path)
+				}
+			}
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":       true,
+			"warc_deleted":  warcDeleted,
+			"message":       fmt.Sprintf("Disk erased. %d WARC file(s) deleted. Pebble DB reset.", warcDeleted),
 		})
 	})
 

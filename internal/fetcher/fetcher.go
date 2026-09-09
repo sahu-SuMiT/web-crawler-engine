@@ -9,14 +9,14 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-// AsyncFetcher handles high-throughput non-blocking HTTP requests using fasthttp.
+// AsyncFetcher: handle non-blocking HTTP requests using fasthttp.
 type AsyncFetcher struct {
 	client    *fasthttp.Client
 	timeout   time.Duration
 	userAgent string
 }
 
-// NewAsyncFetcher creates a fasthttp client configured with connection pooling and timeouts.
+// NewAsyncFetcher: to create fasthttp client with connection pooling and timeouts.
 func NewAsyncFetcher(timeout time.Duration, userAgent string) *AsyncFetcher {
 	if timeout <= 0 {
 		timeout = 10 * time.Second
@@ -39,7 +39,7 @@ func NewAsyncFetcher(timeout time.Duration, userAgent string) *AsyncFetcher {
 	}
 }
 
-// Fetch executes a non-blocking HTTP GET request for the given target URL.
+// Fetch: to execute HTTP GET request for target URL.
 func (f *AsyncFetcher) Fetch(ctx context.Context, item domain.URLItem) domain.FetchResult {
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
@@ -69,17 +69,15 @@ func (f *AsyncFetcher) Fetch(ctx context.Context, item domain.URLItem) domain.Fe
 		return result
 	}
 
-	// Capture Content-Type
 	result.ContentType = string(resp.Header.ContentType())
 
-	// Capture Headers
 	headers := make(map[string]string)
 	resp.Header.VisitAll(func(key, value []byte) {
 		headers[string(key)] = string(value)
 	})
 	result.Headers = headers
 
-	// Copy body bytes (fasthttp reuses response buffers, so we copy)
+	// Copy body bytes (fasthttp reuses response buffers)
 	bodyBytes := resp.Body()
 	result.Body = make([]byte, len(bodyBytes))
 	copy(result.Body, bodyBytes)

@@ -8,15 +8,12 @@ import (
 	"golang.org/x/net/html"
 )
 
-// HTMLParser handles link extraction and URL canonicalization.
 type HTMLParser struct{}
 
-// NewHTMLParser creates a new HTMLParser instance.
 func NewHTMLParser() *HTMLParser {
 	return &HTMLParser{}
 }
 
-// ExtractLinks parses HTML body bytes and returns a list of canonical outbound URLs.
 func (p *HTMLParser) ExtractLinks(rawHTML []byte, baseURLStr string) ([]string, error) {
 	baseURL, err := url.Parse(baseURLStr)
 	if err != nil {
@@ -29,7 +26,7 @@ func (p *HTMLParser) ExtractLinks(rawHTML []byte, baseURLStr string) ([]string, 
 	for {
 		tokenType := tokenizer.Next()
 		if tokenType == html.ErrorToken {
-			break // Reached EOF or parse error
+			break
 		}
 
 		token := tokenizer.Token()
@@ -55,8 +52,6 @@ func (p *HTMLParser) ExtractLinks(rawHTML []byte, baseURLStr string) ([]string, 
 	return extracted, nil
 }
 
-// CanonicalizeURL normalizes raw link references relative to a base URL.
-// Strips anchor fragments, standardizes scheme, and filters out non-HTTP schemes (mailto, javascript, tel).
 func CanonicalizeURL(rawHref string, baseURL *url.URL) (string, bool) {
 	rawHref = strings.TrimSpace(rawHref)
 	if rawHref == "" || strings.HasPrefix(rawHref, "javascript:") || strings.HasPrefix(rawHref, "mailto:") || strings.HasPrefix(rawHref, "tel:") || strings.HasPrefix(rawHref, "data:") {
@@ -70,18 +65,14 @@ func CanonicalizeURL(rawHref string, baseURL *url.URL) (string, bool) {
 
 	resolved := baseURL.ResolveReference(ref)
 
-	// Filter non-http/https
 	scheme := strings.ToLower(resolved.Scheme)
 	if scheme != "http" && scheme != "https" {
 		return "", false
 	}
 
-	// Clean fields
 	resolved.Scheme = scheme
 	resolved.Host = strings.ToLower(resolved.Host)
-	resolved.Fragment = "" // Strip anchor tag fragments
-
-	// Remove default ports
+	resolved.Fragment = ""
 	if (scheme == "http" && resolved.Port() == "80") || (scheme == "https" && resolved.Port() == "443") {
 		resolved.Host = resolved.Hostname()
 	}

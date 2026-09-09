@@ -11,7 +11,6 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-// RobotsEngine fetches, parses, and caches Robots.txt compliance rules per domain.
 type RobotsEngine struct {
 	mu        sync.RWMutex
 	cache     map[string]*robotstxt.Group
@@ -19,7 +18,6 @@ type RobotsEngine struct {
 	client    *fasthttp.Client
 }
 
-// NewRobotsEngine initializes a Robots.txt compliance manager with in-memory domain caching.
 func NewRobotsEngine(userAgent string) *RobotsEngine {
 	if userAgent == "" {
 		userAgent = "WebCrawlerEngine"
@@ -32,17 +30,15 @@ func NewRobotsEngine(userAgent string) *RobotsEngine {
 			Name:                userAgent,
 			ReadTimeout:         5 * time.Second,
 			WriteTimeout:        5 * time.Second,
-			MaxResponseBodySize: 1 * 1024 * 1024, // 1MB max robots.txt
+			MaxResponseBodySize: 1 * 1024 * 1024,
 		},
 	}
 }
 
-// IsAllowed checks if a target URL is permitted to be crawled according to its domain's robots.txt rules.
-// Returns (isAllowed, crawlDelay). If robots.txt cannot be fetched or doesn't exist (HTTP 404), crawling is allowed by default.
 func (r *RobotsEngine) IsAllowed(rawURL string) (bool, time.Duration) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return true, 0 // Allow on parse error
+		return true, 0
 	}
 
 	domain := strings.ToLower(parsed.Hostname())
@@ -52,7 +48,7 @@ func (r *RobotsEngine) IsAllowed(rawURL string) (bool, time.Duration) {
 
 	group := r.getOrFetchRobots(parsed.Scheme, domain)
 	if group == nil {
-		return true, 0 // Default allow if no robots.txt rules apply
+		return true, 0
 	}
 
 	allowed := group.Test(parsed.Path)
@@ -60,7 +56,6 @@ func (r *RobotsEngine) IsAllowed(rawURL string) (bool, time.Duration) {
 	return allowed, crawlDelay
 }
 
-// getOrFetchRobots retrieves the cached robots.txt Group or fetches it from the host.
 func (r *RobotsEngine) getOrFetchRobots(scheme, domain string) *robotstxt.Group {
 	r.mu.RLock()
 	group, exists := r.cache[domain]
@@ -73,7 +68,6 @@ func (r *RobotsEngine) getOrFetchRobots(scheme, domain string) *robotstxt.Group 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Double check after acquiring write lock
 	if group, exists = r.cache[domain]; exists {
 		return group
 	}
@@ -94,7 +88,6 @@ func (r *RobotsEngine) getOrFetchRobots(scheme, domain string) *robotstxt.Group 
 
 	err := r.client.DoTimeout(req, resp, 5*time.Second)
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
-		// If 404 Not Found or fetch error, store empty group (allowed by default)
 		r.cache[domain] = nil
 		return nil
 	}
@@ -105,7 +98,6 @@ func (r *RobotsEngine) getOrFetchRobots(scheme, domain string) *robotstxt.Group 
 		return nil
 	}
 
-	// Find matching User-Agent group (first search for custom agent, fallback to '*')
 	group = data.FindGroup(r.userAgent)
 	if group == nil {
 		group = data.FindGroup("*")

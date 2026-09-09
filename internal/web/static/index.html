@@ -12,27 +12,806 @@
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
+
     input:-webkit-autofill,
-    input:-webkit-autofill:hover, 
-    input:-webkit-autofill:focus, 
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus,
     input:-webkit-autofill:active {
       -webkit-box-shadow: 0 0 0 30px #0f172a inset !important;
       -webkit-text-fill-color: #f8fafc !important;
       transition: background-color 5000s ease-in-out 0s;
     }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 380px;
+      background: #080f1f;
+      border-right: 1px solid rgba(255, 255, 255, 0.07);
+      z-index: 999;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #sidebar.open {
+      transform: translateX(0);
+    }
+
+    #sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 998;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    #sidebar-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .tree-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: default;
+      transition: background 0.15s;
+      font-size: 12px;
+    }
+
+    .tree-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tree-row.folder-row {
+      cursor: pointer;
+    }
+
+    .badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .url-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .filter-tab {
+      color: #64748b;
+      background: transparent;
+      font-size: 12px;
+      padding: 2px 10px;
+      border-radius: 6px;
+      font-weight: 500;
+      transition: all 0.15s;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .filter-tab:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: #94a3b8;
+    }
+
+    .filter-tab.active {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border-color: rgba(99, 102, 241, 0.25);
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spinning {
+      animation: spin 0.8s linear infinite;
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    /* ── WARC Preview Modal ── */
+    #warc-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    #warc-modal.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    #warc-modal-box {
+      background: #0d1527;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      width: 90vw;
+      max-width: 860px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #warc-modal-body {
+      overflow-y: auto;
+      flex: 1;
+      font-family: monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      white-space: pre;
+      padding: 16px;
+      color: #94a3b8;
+    }
+
+    #warc-modal-body .ln {
+      display: inline-block;
+      width: 36px;
+      color: #334155;
+      user-select: none;
+      text-align: right;
+      margin-right: 12px;
+    }
+
+    /* ── URL Detail Popup ── */
+    #url-detail-popup {
+      position: fixed;
+      top: 20px;
+      left: 400px;
+      z-index: 1050;
+      background: #0d1527;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 14px 16px;
+      width: 340px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-8px);
+      transition: opacity 0.18s, transform 0.18s;
+    }
+
+    #url-detail-popup.open {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateY(0);
+    }
+
+    .url-detail-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+    }
+
+    .url-detail-label {
+      color: #475569;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      padding-top: 1px;
+      min-width: 52px;
+    }
+
+    .url-detail-value {
+      color: #94a3b8;
+      font-family: monospace;
+      word-break: break-all;
+      flex: 1;
+    }
+
+    .url-clickable-row {
+      cursor: pointer;
+    }
+
+    .url-clickable-row:hover {
+      background: rgba(99, 102, 241, 0.06);
+    }
+
+    /* ── Erase Disk Button ── */
+    .btn-db-red {
+      background: #0d0000;
+      color: #8b2020;
+      border: 1px solid #2a0000;
+      padding: 4px 12px;
+      font: bold 11px "Courier New", monospace;
+      box-shadow: inset 0 0 0 1px #1a0000;
+      cursor: pointer;
+    }
+
+    .btn-db-red:hover {
+      border-color: #550000;
+      color: #aa2828;
+    }
+
+    .btn-db-red:active {
+      background: #3a0000;
+      color: #cc3333;
+    }
+
+    /* ── Confirm Modal ── */
+    #confirm-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    #confirm-modal.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .legacy-modal-box {
+      width: 430px;
+      background: rgba(8, 0, 0, 0.88);
+      color: #d0d0d0;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 3px;
+      box-shadow:
+        4px 4px 0 rgba(0, 0, 0, 0.55),
+        inset 0 0 0 1px rgba(100, 0, 0, 0.35);
+      font-family: "Courier New", monospace;
+    }
+
+    .legacy-modal-body {
+      padding: 22px 24px 18px;
+    }
+
+    .legacy-modal-message {
+      margin: 0 0 24px;
+      color: rgba(208, 208, 208, 0.85);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .legacy-modal-message strong {
+      color: rgba(255, 0, 0, 0.75);
+      font-weight: bold;
+    }
+
+    .legacy-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .btn-legacy-cancel {
+      background: transparent;
+      color: rgba(170, 170, 170, 0.75);
+      font-family: "Courier New", monospace;
+      font-size: 13px;
+      font-weight: bold;
+      padding: 10px 20px;
+      border: 1px solid rgba(102, 102, 102, 0.55);
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .btn-legacy-cancel:hover {
+      color: rgba(255, 255, 255, 0.9);
+      border-color: rgba(255, 255, 255, 0.65);
+    }
+
+    .btn-legacy-cancel:active {
+      background: rgba(102, 102, 102, 0.5);
+      color: #000;
+    }
+
+    .btn-legacy-ok {
+      background: rgba(8, 0, 0, 0.9);
+      color: rgba(255, 0, 0, 0.75);
+      font-family: "Courier New", monospace;
+      font-size: 13px;
+      font-weight: bold;
+      padding: 10px 20px;
+      border: 1px solid rgba(255, 0, 0, 0.65);
+      border-radius: 3px;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+
+    .btn-legacy-ok:hover {
+      background: rgba(34, 0, 0, 0.9);
+      color: rgba(255, 0, 0, 0.9);
+    }
+
+    .btn-legacy-ok:active {
+      background: rgba(255, 0, 0, 0.8);
+      color: #000000;
+    }
+
+    /* =========================================================
+       LEGACY DASHBOARD OVERRIDES
+       Keeps the existing layout/functionality, but removes the
+       modern glass/rounded SaaS look in favor of a restrained
+       legacy terminal / workstation palette.
+       ========================================================= */
+
+    body.bg-slate-950 {
+      background: #080a0d !important;
+      color: #d2d2d2 !important;
+      font-family: "Courier New", monospace !important;
+    }
+
+    .glass {
+      background: #11151a !important;
+      backdrop-filter: none !important;
+      border: 1px solid #30353b !important;
+      border-radius: 4px !important;
+      box-shadow: inset 0 0 0 1px #090b0e !important;
+    }
+
+    /* Main dashboard panels */
+    .max-w-7xl.mx-auto.p-6.space-y-6 {
+      padding: 20px !important;
+      max-width: 1280px !important;
+    }
+
+    .max-w-7xl.mx-auto.p-6.space-y-6>.glass {
+      padding: 18px !important;
+    }
+
+    /* Header */
+    .max-w-7xl.mx-auto.p-6.space-y-6>header {
+      min-height: 74px;
+    }
+
+    .max-w-7xl.mx-auto.p-6.space-y-6>header h1 {
+      background: none !important;
+      color: #d33a3a !important;
+      -webkit-text-fill-color: #d33a3a !important;
+      font-family: "Courier New", monospace !important;
+      font-size: 25px !important;
+      letter-spacing: 0.02em;
+    }
+
+    .max-w-7xl.mx-auto.p-6.space-y-6>header p {
+      color: #858b92 !important;
+      font-family: "Courier New", monospace !important;
+      font-size: 12px !important;
+    }
+
+    .max-w-7xl.mx-auto.p-6.space-y-6>header button {
+      border-radius: 2px !important;
+    }
+
+    .max-w-7xl.mx-auto.p-6.space-y-6>header button span {
+      border-radius: 0 !important;
+      background: #aeb4bb !important;
+    }
+
+    .max-w-7xl.mx-auto.p-6.space-y-6>header>div:last-child span {
+      background: #11151a !important;
+      color: #6fcf97 !important;
+      border: 1px solid #28533d !important;
+      border-radius: 3px !important;
+      font-family: "Courier New", monospace !important;
+      padding: 5px 9px !important;
+    }
+
+    .max-w-7xl.mx-auto.p-6.space-y-6>header>div:last-child span>span {
+      background: #4e9b72 !important;
+      border-radius: 50% !important;
+      padding: 0 !important;
+      display: inline-block !important;
+    }
+
+    /* Seed controls */
+    #crawl-form {
+      gap: 12px !important;
+    }
+
+    #crawl-form label {
+      color: #858b92 !important;
+      font-family: "Courier New", monospace !important;
+      font-size: 11px !important;
+      letter-spacing: 0.08em !important;
+    }
+
+    #url-input,
+    #depth-input,
+    #workers-input {
+      background: #0b0e12 !important;
+      color: #d5d5d5 !important;
+      border: 1px solid #343a40 !important;
+      border-radius: 3px !important;
+      box-shadow: inset 1px 1px 0 #07090b !important;
+      font-family: "Courier New", monospace !important;
+      padding-top: 10px !important;
+      padding-bottom: 10px !important;
+    }
+
+    #url-input::placeholder {
+      color: #5f6871 !important;
+      opacity: 1 !important;
+    }
+
+    #url-input:focus,
+    #depth-input:focus,
+    #workers-input:focus {
+      border-color: #8f3030 !important;
+      box-shadow: inset 1px 1px 0 #07090b, 0 0 0 1px #3d1717 !important;
+    }
+
+    #submit-btn {
+      background: #7f2020 !important;
+      color: #f1eaea !important;
+      border: 1px solid #b04444 !important;
+      border-radius: 3px !important;
+      box-shadow: inset 1px 1px 0 #c45b5b, inset -1px -1px 0 #4a0e0e !important;
+      font-family: "Courier New", monospace !important;
+      font-size: 13px !important;
+      text-transform: uppercase !important;
+      padding: 10px 20px !important;
+    }
+
+    #submit-btn:hover {
+      background: #962727 !important;
+    }
+
+    #submit-btn:active {
+      background: #5d1616 !important;
+      box-shadow: inset 1px 1px 0 #3d0b0b !important;
+    }
+
+    /* Metrics */
+    .grid.grid-cols-1.md\:grid-cols-4 {
+      gap: 10px !important;
+    }
+
+    .grid.grid-cols-1.md\:grid-cols-4>.glass {
+      padding: 15px !important;
+      min-height: 82px;
+    }
+
+    .grid.grid-cols-1.md\:grid-cols-4>.glass>span {
+      color: #777f87 !important;
+      font-family: "Courier New", monospace !important;
+      font-size: 10px !important;
+    }
+
+    #metric-crawled,
+    #metric-queued,
+    #metric-workers,
+    #metric-errors {
+      font-family: "Courier New", monospace !important;
+      font-size: 27px !important;
+      margin-top: 7px !important;
+    }
+
+    #metric-crawled {
+      color: #b8c0c8 !important;
+    }
+
+    #metric-queued {
+      color: #b8b0a0 !important;
+    }
+
+    #metric-workers {
+      color: #6fcf97 !important;
+    }
+
+    #metric-errors {
+      color: #d35b5b !important;
+    }
+
+    /* Terminal */
+    .max-w-7xl.mx-auto.p-6.space-y-6>.glass:last-child h2 {
+      margin-bottom: 12px !important;
+    }
+
+    #warc-file {
+      color: #858b92 !important;
+      font-family: "Courier New", monospace !important;
+    }
+
+    #log-container {
+      background: #080a0d !important;
+      border: 1px solid #30353b !important;
+      border-radius: 3px !important;
+      box-shadow: inset 0 0 0 1px #050608 !important;
+      color: #9ca3aa !important;
+      padding: 12px !important;
+    }
+
+    /* Muted legacy log colors */
+    #log-container .text-emerald-400 {
+      color: #72a887 !important;
+    }
+
+    #log-container .text-amber-400 {
+      color: #b59a62 !important;
+    }
+
+    #log-container .text-rose-400 {
+      color: #c05b5b !important;
+    }
+
+    #log-container .text-blue-300 {
+      color: #8e9ba8 !important;
+    }
+
+    #log-container .text-slate-500 {
+      color: #596169 !important;
+    }
+
+    /* Sidebar */
+    #sidebar {
+      background: #0b0e12 !important;
+      border-right: 1px solid #353a40 !important;
+    }
+
+    .explorer-title {
+      font-family: "Courier New", monospace !important;
+      font-size: 14px !important;
+      font-weight: bold !important;
+      color: #d2d2d2 !important;
+    }
+
+    #sidebar .rounded-lg,
+    #sidebar .rounded-xl {
+      border-radius: 2px !important;
+    }
+
+    .tree-row {
+      border-radius: 2px !important;
+      padding: 4px 10px !important;
+      font-family: "Courier New", monospace !important;
+    }
+
+    .tree-row:hover {
+      background: #191d22 !important;
+    }
+
+    .filter-tab {
+      border-radius: 2px !important;
+      font-family: "Courier New", monospace !important;
+      color: #70777e !important;
+    }
+
+    .filter-tab.active {
+      background: #291313 !important;
+      color: #c96565 !important;
+      border-color: #6a2929 !important;
+    }
+
+    .badge {
+      border-radius: 2px !important;
+      font-family: "Courier New", monospace !important;
+    }
+
+    /* WARC and URL popups */
+    #warc-modal-box,
+    #url-detail-popup {
+      background: #101419 !important;
+      border: 1px solid #383e44 !important;
+      border-radius: 4px !important;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+    }
+
+    #warc-modal-box select,
+    #url-detail-popup button {
+      border-radius: 2px !important;
+    }
+
+    /* Keep confirmation dialog aligned with the selected red legacy button */
+    .legacy-modal-box {
+      background: rgba(8, 0, 0, 0.88) !important;
+      border: 1px solid rgba(255, 255, 255, 0.45) !important;
+      border-radius: 3px !important;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+    }
   </style>
 </head>
 
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+  <!-- Sidebar Overlay -->
+  <div id="sidebar-overlay" onclick="closeSidebar(); closeURLDetail()"></div>
+
+  <!-- URL Detail Popup -->
+  <div id="url-detail-popup">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-bold text-slate-300">URL Record</span>
+      <button onclick="closeURLDetail()" class="text-slate-500 hover:text-slate-300 transition-colors">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <div id="url-detail-body"></div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirm-modal" onclick="if(event.target===this) closeEraseConfirm()">
+    <div class="legacy-modal-box">
+      <div class="legacy-modal-body">
+        <p class="legacy-modal-message">
+          Permanently erase <strong>ALL Pebble records</strong><br>
+          and <strong>WARC files</strong>?
+        </p>
+        <div class="legacy-modal-actions">
+          <button class="btn-legacy-cancel" onclick="closeEraseConfirm()">Cancel</button>
+          <button class="btn-legacy-ok" onclick="executeEraseDisk()">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WARC Preview Modal -->
+  <div id="warc-modal" onclick="closeModal(event)">
+    <div id="warc-modal-box">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-white/5 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"
+            stroke-linecap="round">
+            <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z" />
+            <polyline points="13 2 13 9 20 9" />
+          </svg>
+          <span id="warc-modal-title" class="text-sm font-semibold text-slate-200 font-mono"></span>
+        </div>
+        <div class="flex items-center gap-3">
+          <label class="text-xs text-slate-400 flex items-center gap-2">
+            Lines
+            <select id="modal-lines" onchange="refreshPreview()"
+              class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500">
+              <option value="50">50</option>
+              <option value="100" selected>100</option>
+              <option value="250">250</option>
+              <option value="500">500</option>
+              <option value="1000">1000</option>
+            </select>
+          </label>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div id="warc-modal-loading" class="text-center py-8 text-slate-500 text-sm hidden">Loading...</div>
+      <div id="warc-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="flex items-center justify-between px-4 py-4 border-b border-white/5 flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <svg width="16" height="16" viewBox="0 0 18 16" style="margin-top: -2px;">
+          <path d="M1 3h6l2 2h8v9H1z" fill="#245b9a" stroke="#8fb9e8" stroke-width="1" />
+          <path d="M2 5h15v1H2z" fill="#6fa3d8" />
+          <path d="M2 7h14v6H2z" fill="#3f7fbd" />
+          <path d="M2 13h14v1H2z" fill="#183d68" />
+        </svg>
+
+        <span class="explorer-title">File Explorer</span>
+      </div>
+      <div class="flex items-center gap-1">
+        <button onclick="loadSidebarData()" title="Refresh"
+          class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors text-slate-400 hover:text-slate-200">
+          <svg id="refresh-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round">
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+          </svg>
+        </button>
+        <button onclick="closeSidebar()"
+          class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors text-slate-400 hover:text-slate-200">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="flex gap-1 px-3 py-2 border-b border-white/5 flex-shrink-0">
+      <button class="filter-tab active" onclick="setFilter(this, '')">All</button>
+      <button class="filter-tab" onclick="setFilter(this, 'CRAWLED')">Crawled</button>
+      <button class="filter-tab" onclick="setFilter(this, 'QUEUED')">Queued</button>
+      <button class="filter-tab" onclick="setFilter(this, 'FAILED')">Failed</button>
+    </div>
+
+    <div id="sidebar-content" class="flex-1 overflow-y-auto py-2 px-2">
+      <div class="text-slate-500 text-xs px-3 py-8 text-center">Click refresh to load data</div>
+    </div>
+
+    <div id="sidebar-footer" class="px-4 py-3 border-t border-white/5 flex-shrink-0 hidden">
+      <div class="flex items-center gap-3 text-xs text-slate-500">
+        <span class="flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+          <span><span id="footer-pebble-count">0</span> records</span>
+        </span>
+        <span>📦 <span id="footer-warc-count">0</span> WARC files</span>
+        <button id="erase-disk-btn" onclick="eraseDisk()" title="Erase all Pebble DB and WARC data"
+          class="btn-db-red ml-auto">ERASE DISK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content (unchanged from your original) -->
   <div class="max-w-7xl mx-auto p-6 space-y-6">
 
     <!-- Header -->
     <header class="flex items-center justify-between glass p-6 rounded-2xl">
-      <div>
-        <h1 class="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-          Web Crawler Engine
-        </h1>
-        <p class="text-slate-400 text-sm mt-1">Golang Event-Driven Crawler Engine</p>
+      <div class="flex items-center gap-3">
+        <!-- Hamburger button — only addition to header -->
+        <button onclick="openSidebar()" title="Data Explorer"
+          class="flex flex-col justify-center items-center gap-1.5 w-9 h-9 rounded-xl hover:bg-white/5 transition-colors flex-shrink-0">
+          <span class="block w-5 h-0.5 bg-slate-400 rounded"></span>
+          <span class="block w-5 h-0.5 bg-slate-400 rounded"></span>
+          <span class="block w-5 h-0.5 bg-slate-400 rounded"></span>
+        </button>
+        <div>
+          <h1
+            class="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+            Web Crawler Engine
+          </h1>
+          <p class="text-slate-400 text-sm mt-1">Golang Event-Driven Crawler Engine</p>
+        </div>
       </div>
       <div class="flex items-center space-x-3">
         <span
@@ -48,8 +827,8 @@
         <div class="flex-1 w-full">
           <label for="url-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Target
             URL</label>
-          <input type="url" id="url-input" placeholder="https://books.toscrape.com" required
-            autocomplete="url" autocapitalize="none" spellcheck="false"
+          <input type="url" id="url-input" placeholder="https://books.toscrape.com" required autocomplete="url"
+            autocapitalize="none" spellcheck="false"
             class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-sm select-text">
         </div>
         <div class="w-full md:w-32">
@@ -119,6 +898,7 @@
   </div>
 
   <script>
+    // ── Original SSE + Stats (unchanged) ──
     const logContainer = document.getElementById('log-container');
     const evtSource = new EventSource('/events');
 
@@ -150,6 +930,7 @@
       }
     };
 
+    // ── Original crawl form (unchanged) ──
     document.getElementById('crawl-form').addEventListener('submit', async function (e) {
       e.preventDefault();
       const urlInput = document.getElementById('url-input').value.trim();
@@ -161,6 +942,34 @@
 
       submitBtn.disabled = true;
       submitBtn.classList.add('opacity-50');
+
+      // Processing animation in the terminal
+      const logContainer = document.getElementById('log-container');
+      const addAnimatedLog = async (baseText, durationMs) => {
+        const div = document.createElement('div');
+        div.className = 'text-slate-500 font-light italic';
+        div.textContent = baseText;
+        logContainer.appendChild(div);
+        logContainer.scrollTop = logContainer.scrollHeight;
+
+        let dots = 0;
+        const intervalId = setInterval(() => {
+          dots = (dots + 1) % 4;
+          div.textContent = baseText + '.'.repeat(dots);
+        }, 300);
+
+        await new Promise(r => setTimeout(r, durationMs));
+        clearInterval(intervalId);
+        div.textContent = baseText + '...';
+      };
+
+      const pool = ['Engine starting', 'processing', 'unpacking', 'working', 'executing', 'initializing', 'resolving', 'booting'];
+      const shuffled = pool.sort(() => 0.5 - Math.random());
+      const selected = shuffled.slice(0, 3);
+
+      for (const word of selected) {
+        await addAnimatedLog(word, 4000);
+      }
 
       try {
         await fetch('/api/crawl', {
@@ -175,6 +984,314 @@
         submitBtn.classList.remove('opacity-50');
       }
     });
+
+    // ── Sidebar (new addition only) ──
+    let activeFilter = '';
+
+    function openSidebar() {
+      document.getElementById('sidebar').classList.add('open');
+      document.getElementById('sidebar-overlay').classList.add('visible');
+      loadSidebarData();
+    }
+
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('visible');
+    }
+
+    function setFilter(btn, filter) {
+      activeFilter = filter;
+      document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadSidebarData();
+    }
+
+    async function loadSidebarData() {
+      const icon = document.getElementById('refresh-icon');
+      icon.classList.add('spinning');
+      try {
+        const url = activeFilter ? `/api/data?status=${activeFilter}` : '/api/data';
+        const res = await fetch(url);
+        const data = await res.json();
+        renderSidebar(data);
+      } catch (err) {
+        document.getElementById('sidebar-content').innerHTML =
+          `<div class="text-rose-400 text-xs px-3 py-4">Failed to load: ${err.message}</div>`;
+      } finally {
+        icon.classList.remove('spinning');
+      }
+    }
+
+    const STATUS_COLORS = {
+      'CRAWLED': { dot: '#22c55e', badge: 'background:rgba(34,197,94,0.12);color:#4ade80;border:1px solid rgba(34,197,94,0.2)' },
+      'QUEUED': { dot: '#6366f1', badge: 'background:rgba(99,102,241,0.12);color:#a5b4fc;border:1px solid rgba(99,102,241,0.2)' },
+      'FETCHING': { dot: '#f59e0b', badge: 'background:rgba(245,158,11,0.12);color:#fcd34d;border:1px solid rgba(245,158,11,0.2)' },
+      'FAILED': { dot: '#ef4444', badge: 'background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.2)' },
+    };
+
+    function domainFromURL(urlStr) {
+      try { return new URL(urlStr).hostname; } catch { return urlStr; }
+    }
+
+    function renderSidebar(data) {
+      const pebbleDomains = data.pebble_domains || [];
+      const warcDomains = data.warc_domains || [];
+
+      const totalPebble = pebbleDomains.reduce((sum, d) => sum + d.count, 0);
+      const totalWarcFiles = warcDomains.reduce((sum, d) => sum + d.files.length, 0);
+      document.getElementById('footer-pebble-count').textContent = totalPebble;
+      document.getElementById('footer-warc-count').textContent = totalWarcFiles;
+      document.getElementById('sidebar-footer').classList.remove('hidden');
+
+      let html = '';
+
+      // Pebble DB section – domain summaries only, URLs load on-demand
+      html += `
+        <div class="mb-1">
+          <div class="tree-row folder-row" onclick="toggleFolder('pebble-root')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#6366f1" opacity="0.8"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+            <span class="text-slate-300 font-semibold text-xs">Pebble DB</span>
+            <span class="ml-auto badge" style="background:rgba(99,102,241,0.12);color:#a5b4fc;border:1px solid rgba(99,102,241,0.2)">${totalPebble}</span>
+            <svg id="chevron-pebble-root" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" style="transition:transform 0.2s"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div id="pebble-root" style="display:none;padding-left:16px">
+      `;
+
+      if (pebbleDomains.length === 0) {
+        html += `<div class="text-slate-500 text-xs px-3 py-2">No records found</div>`;
+      } else {
+        for (const ds of pebbleDomains) {
+          const fid = 'dom-' + ds.domain.replace(/[^a-zA-Z0-9]/g, '_');
+          html += `
+            <div>
+              <div class="tree-row folder-row" onclick="loadPebbleDomain('${ds.domain}', '${fid}')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#64748b" opacity="0.6"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+                <span class="text-slate-400 font-medium url-text" style="max-width:180px">${ds.domain}</span>
+                <span class="ml-auto badge" style="background:rgba(99,102,241,0.12);color:#a5b4fc;border:1px solid rgba(99,102,241,0.2)">${ds.count}</span>
+                <svg id="chevron-${fid}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" style="transition:transform 0.2s"><polyline points="9 18 15 12 9 6"/></svg>
+              </div>
+              <div id="${fid}" style="display:none;padding-left:14px">
+                <div id="${fid}-content" class="text-slate-600 text-xs px-3 py-1 font-mono">Click to load...</div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      html += `</div></div>`;
+
+      // WARC Archives – domain-grouped
+      html += `
+        <div class="mb-1 mt-1 border-t border-white/5 pt-1">
+          <div class="tree-row folder-row" onclick="toggleFolder('warc-root')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span class="text-slate-300 font-semibold text-xs">WARC Archives</span>
+            <span class="ml-auto badge" style="background:rgba(245,158,11,0.12);color:#fcd34d;border:1px solid rgba(245,158,11,0.2)">${totalWarcFiles}</span>
+            <svg id="chevron-warc-root" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" style="transition:transform 0.2s"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div id="warc-root" style="display:none;padding-left:16px">
+      `;
+
+      if (warcDomains.length === 0) {
+        html += `<div class="text-slate-500 text-xs px-3 py-2">No WARC files found</div>`;
+      } else {
+        for (const group of warcDomains) {
+          const fid = 'warc-' + group.domain.replace(/[^a-zA-Z0-9]/g, '_');
+          html += `
+            <div>
+              <div class="tree-row folder-row" onclick="toggleFolder('${fid}')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#64748b" opacity="0.6"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+                <span class="text-amber-300/80 font-medium url-text" style="font-size:11px;max-width:190px">${group.domain}</span>
+                <span class="ml-auto badge" style="background:rgba(245,158,11,0.12);color:#fcd34d;border:1px solid rgba(245,158,11,0.2)">${group.files.length}</span>
+                <svg id="chevron-${fid}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" style="transition:transform 0.2s"><polyline points="9 18 15 12 9 6"/></svg>
+              </div>
+              <div id="${fid}" style="display:none;padding-left:14px">
+          `;
+          for (const f of group.files) {
+            html += `
+              <div class="tree-row font-mono" title="Click to preview ${f.name}" onclick="previewWARC('${group.domain}','${f.name}')" style="cursor:pointer">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                <span class="text-slate-300 url-text" style="font-size:11px;max-width:175px">${f.name}</span>
+                <span class="ml-1 text-amber-400/70" style="font-size:10px;white-space:nowrap">${f.size_mb}</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </div>
+              <div class="font-mono text-slate-600 pb-1" style="font-size:10px;padding-left:38px">${f.mod_time}</div>
+            `;
+          }
+          html += `</div></div>`;
+        }
+      }
+
+      html += `</div></div>`;
+      document.getElementById('sidebar-content').innerHTML = html;
+    }
+
+    function toggleFolder(id) {
+      const el = document.getElementById(id);
+      const chevron = document.getElementById('chevron-' + id);
+      if (!el) return;
+      const isOpen = el.style.display !== 'none';
+      el.style.display = isOpen ? 'none' : 'block';
+      if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(90deg)';
+    }
+
+    // ── On-demand Pebble domain loader ──
+    const _pebbleLoaded = new Set(); // tracks which domains have been fetched
+
+    async function loadPebbleDomain(domainName, fid) {
+      const el = document.getElementById(fid);
+      const chevron = document.getElementById('chevron-' + fid);
+      if (!el) return;
+
+      const isOpen = el.style.display !== 'none';
+
+      if (isOpen) {
+        // Just collapse — no re-fetch needed
+        el.style.display = 'none';
+        if (chevron) chevron.style.transform = '';
+        return;
+      }
+
+      // Expand
+      el.style.display = 'block';
+      if (chevron) chevron.style.transform = 'rotate(90deg)';
+
+      // If already loaded, just show
+      if (_pebbleLoaded.has(fid)) return;
+
+      // First open — fetch from server
+      const contentEl = document.getElementById(fid + '-content');
+      if (contentEl) contentEl.textContent = 'Loading...';
+
+      try {
+        const status = activeFilter || '';
+        const res = await fetch(`/api/pebble?domain=${encodeURIComponent(domainName)}&status=${status}&limit=200`);
+        const items = await res.json();
+        _pebbleLoaded.add(fid);
+        if (contentEl) contentEl.outerHTML = renderPebbleURLs(items);
+      } catch (err) {
+        if (contentEl) contentEl.textContent = 'Error: ' + err.message;
+      }
+    }
+
+    function renderPebbleURLs(items) {
+      if (!items || items.length === 0) {
+        return `<div class="text-slate-600 text-xs px-3 py-1">No URLs found</div>`;
+      }
+      return items.map(item => {
+        const sc = STATUS_COLORS[item.status] || STATUS_COLORS['QUEUED'];
+        const path = (() => { try { return new URL(item.url).pathname || '/'; } catch { return item.url; } })();
+        const encoded = encodeURIComponent(JSON.stringify(item));
+        return `
+          <div class="tree-row font-mono url-clickable-row" title="Click to view details" style="font-size:11px"
+            onclick="showURLDetail(decodeURIComponent('${encoded}'))">
+            <div class="status-dot" style="background:${sc.dot}"></div>
+            <span class="text-slate-400 url-text" style="max-width:210px">${path}</span>
+            <span class="ml-auto text-slate-600" style="font-size:10px">${item.depth ?? ''}</span>
+          </div>`;
+      }).join('');
+    }
+
+    function showURLDetail(encodedItem) {
+      const item = JSON.parse(encodedItem);
+      const sc = STATUS_COLORS[item.status] || STATUS_COLORS['QUEUED'];
+      const statusBadge = `<span style="${sc.badge};padding:1px 7px;border-radius:999px;font-size:10px;font-weight:600">${item.status || 'UNKNOWN'}</span>`;
+
+      document.getElementById('url-detail-body').innerHTML = `
+        <div class="url-detail-row">
+          <span class="url-detail-label">URL</span>
+          <a href="${item.url || '#'}" target="_blank" class="url-detail-value" style="color:#818cf8;text-decoration:underline;text-underline-offset:3px;cursor:pointer">${item.url || ''}</a>
+        </div>
+        <div class="url-detail-row">
+          <span class="url-detail-label">Domain</span>
+          <span class="url-detail-value">${item.domain || ''}</span>
+        </div>
+        <div class="url-detail-row">
+          <span class="url-detail-label">Status</span>
+          <span class="url-detail-value">${statusBadge}</span>
+        </div>
+        <div class="url-detail-row">
+          <span class="url-detail-label">Depth</span>
+          <span class="url-detail-value">${item.depth ?? '—'}</span>
+        </div>
+        ${item.error ? `
+        <div class="url-detail-row">
+          <span class="url-detail-label">Error</span>
+          <span class="url-detail-value" style="color:#f87171">${item.error}</span>
+        </div>` : ''}
+      `;
+      document.getElementById('url-detail-popup').classList.add('open');
+    }
+
+    function closeURLDetail() {
+      document.getElementById('url-detail-popup').classList.remove('open');
+    }
+
+    function closeEraseConfirm() {
+      document.getElementById('confirm-modal').classList.remove('open');
+    }
+
+    function eraseDisk() {
+      document.getElementById('confirm-modal').classList.add('open');
+    }
+
+    async function executeEraseDisk() {
+      closeEraseConfirm();
+      try {
+        const res = await fetch('/api/erase-disk', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          refreshSidebar();
+        } else {
+          console.error('Erase returned error:', data.message);
+        }
+      } catch (err) {
+        console.error('Erase request failed:', err);
+      }
+    }
+
+
+    // ── WARC Preview ──
+    let currentPreviewFile = '';
+    let currentPreviewDomain = '';
+
+    async function previewWARC(domainName, filename) {
+      closeURLDetail(); // Hide the smaller URL popup to reduce clutter
+      currentPreviewFile = filename;
+      currentPreviewDomain = domainName;
+      const lines = document.getElementById('modal-lines').value;
+      document.getElementById('warc-modal-title').textContent = domainName + '/' + filename;
+      document.getElementById('warc-modal-body').textContent = '';
+      document.getElementById('warc-modal-loading').classList.remove('hidden');
+      document.getElementById('warc-modal').classList.add('open');
+
+      try {
+        const res = await fetch(`/api/warc-preview?domain=${encodeURIComponent(domainName)}&file=${encodeURIComponent(filename)}&lines=${lines}`);
+        const text = await res.text();
+        document.getElementById('warc-modal-loading').classList.add('hidden');
+        const body = document.getElementById('warc-modal-body');
+        const lineArr = text.split('\n');
+        body.innerHTML = lineArr.map((line, i) =>
+          `<span class="ln">${i + 1}</span>${escapeHtml(line)}`
+        ).join('\n');
+      } catch (err) {
+        document.getElementById('warc-modal-loading').classList.add('hidden');
+        document.getElementById('warc-modal-body').textContent = 'Error: ' + err.message;
+      }
+    }
+
+    function refreshPreview() {
+      if (currentPreviewFile) previewWARC(currentPreviewDomain, currentPreviewFile);
+    }
+
+    function closeModal(e) {
+      if (e && e.target !== document.getElementById('warc-modal')) return;
+      document.getElementById('warc-modal').classList.remove('open');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
   </script>
 </body>
 

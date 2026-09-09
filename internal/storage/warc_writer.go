@@ -11,44 +11,70 @@ import (
 	"github.com/sahu-SuMiT/web-crawler-engine/internal/domain"
 )
 
-// WARCWriter exports fetched page payloads into ISO 28500 standard .warc.gz archives.
-type WARCWriter struct {
-	mu       sync.Mutex
-	filePath string
+type domainWriter struct {
 	file     *os.File
 	gzWriter *gzip.Writer
+	filePath string
 }
 
-// NewWARCWriter opens or creates a gzipped WARC archive file at the destination path.
+type WARCWriter struct {
+	mu        sync.Mutex
+	outputDir string
+	writers   map[string]*domainWriter
+}
+
 func NewWARCWriter(outputDir string) (*WARCWriter, error) {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create warc output dir: %w", err)
+		return nil, fmt.Errorf("failed to create warc base dir: %w", err)
+	}
+	return &WARCWriter{
+		outputDir: outputDir,
+		writers:   make(map[string]*domainWriter),
+	}, nil
+}
+
+func (w *WARCWriter) getDomainWriter(domainName string) (*domainWriter, error) {
+	if domainName == "" {
+		domainName = "unsorted"
 	}
 
+	if dw, exists := w.writers[domainName]; exists {
+		return dw, nil
+	}
+
+	domainDir := filepath.Join(w.outputDir, domainName)
+	if err := os.MkdirAll(domainDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create domain warc dir: %w", err)
+	}
 	fileName := fmt.Sprintf("crawl_%s.warc.gz", time.Now().Format("20060102_150405"))
-	fullPath := filepath.Join(outputDir, fileName)
+	fullPath := filepath.Join(domainDir, fileName)
 
 	f, err := os.Create(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create warc file: %w", err)
 	}
 
-	gz := gzip.NewWriter(f)
-	return &WARCWriter{
-		filePath: fullPath,
+	dw := &domainWriter{
 		file:     f,
-		gzWriter: gz,
-	}, nil
+		gzWriter: gzip.NewWriter(f),
+		filePath: fullPath,
+	}
+	w.writers[domainName] = dw
+	return dw, nil
 }
 
-// WriteRecord writes a fetched page payload into the gzipped WARC archive.
 func (w *WARCWriter) WriteRecord(result domain.FetchResult) error {
 	if len(result.Body) == 0 || result.StatusCode == 0 {
-		return nil // Skip empty responses
+		return nil
 	}
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	dw, err := w.getDomainWriter(result.Domain)
+	if err != nil {
+		return err
+	}
 
 	nowStr := time.Now().UTC().Format(time.RFC3339)
 	httpHeaderBlock := fmt.Sprintf("HTTP/1.1 %d OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n",
@@ -71,34 +97,42 @@ func (w *WARCWriter) WriteRecord(result domain.FetchResult) error {
 		len(fullPayload),
 	)
 
-	if _, err := w.gzWriter.Write([]byte(warcHeader)); err != nil {
+	if _, err := dw.gzWriter.Write([]byte(warcHeader)); err != nil {
 		return fmt.Errorf("warc write header error: %w", err)
 	}
-	if _, err := w.gzWriter.Write(fullPayload); err != nil {
+	if _, err := dw.gzWriter.Write(fullPayload); err != nil {
 		return fmt.Errorf("warc write payload error: %w", err)
 	}
-	if _, err := w.gzWriter.Write([]byte("\r\n\r\n")); err != nil {
+	if _, err := dw.gzWriter.Write([]byte("\r\n\r\n")); err != nil {
 		return fmt.Errorf("warc write footer error: %w", err)
 	}
 
-	return w.gzWriter.Flush()
+	return dw.gzWriter.Flush()
 }
 
-// FilePath returns the absolute path of the WARC archive file.
-func (w *WARCWriter) FilePath() string {
-	return w.filePath
+func (w *WARCWriter) FilePaths() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	paths := make([]string, 0, len(w.writers))
+	for _, dw := range w.writers {
+		paths = append(paths, dw.filePath)
+	}
+	return paths
 }
 
-// Close flushes and closes the WARC writer.
 func (w *WARCWriter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.gzWriter != nil {
-		w.gzWriter.Close()
+	var lastErr error
+	for _, dw := range w.writers {
+		if err := dw.gzWriter.Close(); err != nil {
+			lastErr = err
+		}
+		if err := dw.file.Close(); err != nil {
+			lastErr = err
+		}
 	}
-	if w.file != nil {
-		return w.file.Close()
-	}
-	return nil
+	return lastErr
 }
