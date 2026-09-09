@@ -180,7 +180,7 @@
       flex: 1;
       font-family: monospace;
       font-size: 11px;
-      line-height: 1.6;
+      line-height: 1.2;
       white-space: pre;
       padding: 16px;
       color: #94a3b8;
@@ -553,12 +553,16 @@
       font-family: "Courier New", monospace !important;
       font-size: 25px !important;
       letter-spacing: 0.02em;
+      line-height: 1.1 !important;
+      margin-bottom: 2px !important;
     }
 
     .max-w-7xl.mx-auto.p-6.space-y-6>header p {
       color: #858b92 !important;
       font-family: "Courier New", monospace !important;
       font-size: 12px !important;
+      margin-top: 2px !important;
+      line-height: 1.1 !important;
     }
 
     .max-w-7xl.mx-auto.p-6.space-y-6>header button {
@@ -959,7 +963,7 @@
             class="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
             Web Crawler Engine
           </h1>
-          <p class="text-slate-400 text-sm mt-1">Golang Event-Driven Crawler Engine</p>
+          <p class="text-slate-400 text-sm mt-0.5">Golang Event-Driven Crawler Engine</p>
         </div>
       </div>
       <div class="flex items-center space-x-3">
@@ -1112,13 +1116,10 @@
         div.textContent = baseText + '...';
       };
 
-      const pool = ['Engine starting', 'processing', 'unpacking', 'working', 'executing', 'initializing', 'resolving', 'booting'];
-      const shuffled = pool.sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, 3);
+      const pool = ['processing', 'working', 'unpacking', 'executing'];
+      const selectedWord = pool[Math.floor(Math.random() * pool.length)];
 
-      for (const word of selected) {
-        await addAnimatedLog(word, 4000);
-      }
+      await addAnimatedLog(selectedWord, 4000);
 
       try {
         await fetch('/api/crawl', {
