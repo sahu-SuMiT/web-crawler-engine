@@ -135,11 +135,15 @@ func (s *Server) Start() error {
 		}
 
 		var warcGroups []WARCDomain
+		hasUnsorted := false
 		if s.warcDir != "" {
 			domainEntries, _ := os.ReadDir(s.warcDir)
 			for _, de := range domainEntries {
 				if !de.IsDir() {
 					continue
+				}
+				if de.Name() == "unsorted" {
+					hasUnsorted = true
 				}
 				domainPath := filepath.Join(s.warcDir, de.Name())
 				fileEntries, _ := os.ReadDir(domainPath)
@@ -167,6 +171,13 @@ func (s *Server) Start() error {
 					Files:  files,
 				})
 			}
+		}
+
+		if !hasUnsorted {
+			warcGroups = append(warcGroups, WARCDomain{
+				Domain: "unsorted",
+				Files:  []WARCFile{},
+			})
 		}
 
 		// Pebble: return only domain summaries (count per domain), no individual URLs.
