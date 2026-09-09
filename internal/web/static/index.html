@@ -168,7 +168,8 @@
       border-radius: 16px;
       width: 90vw;
       max-width: 860px;
-      max-height: 80vh;
+      height: 590px;
+      max-height: 85vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -187,11 +188,149 @@
 
     #warc-modal-body .ln {
       display: inline-block;
-      width: 36px;
-      color: #334155;
+      width: 48px;
+      color: #415064;
       user-select: none;
       text-align: right;
       margin-right: 12px;
+    }
+
+    .lines-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #8797aa;
+      font: 11px "Courier New", monospace;
+    }
+
+    .lines-control select {
+      background: #0a1421;
+      color: #c8d8ea;
+      border: 1px solid #315b89;
+      border-radius: 2px;
+      padding: 4px 7px;
+      font: 11px "Courier New", monospace;
+      outline: none;
+    }
+
+    .range-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .range-controls input {
+      width: 58px;
+      height: 25px;
+      box-sizing: border-box;
+      background: #09111e;
+      color: #c6d7ea;
+      border: 1px solid #2a3e5b;
+      border-radius: 2px;
+      padding: 4px 6px;
+      font: 11px "Courier New", monospace;
+      outline: none;
+    }
+
+    .range-controls input::placeholder {
+      color: #71839b;
+      opacity: 1;
+    }
+
+    .range-controls input:focus {
+      border-color: #4b7fb5;
+    }
+
+    .legacy-range-apply {
+      height: 25px;
+      background: #101c2d;
+      color: #78aeea;
+      border: 1px solid #315d8e;
+      padding: 3px 8px;
+      font: bold 11px "Courier New", monospace;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+
+    .legacy-range-apply:hover {
+      background: #172b46;
+      color: #a8ccf5;
+    }
+
+    .legacy-range-apply.error {
+      background: #2a0808;
+      color: #ff4b4b;
+      border-color: #c62828;
+    }
+
+    .range-error {
+      display: none;
+      position: absolute;
+      top: calc(100% + 7px);
+      right: 0;
+      z-index: 10;
+      min-width: 190px;
+      padding: 7px 10px;
+      background: #180707;
+      color: #ff5c5c;
+      border: 1px solid #8f2424;
+      border-radius: 2px;
+      font: bold 11px "Courier New", monospace;
+      box-shadow: 3px 3px 0 rgba(0, 0, 0, .45);
+    }
+
+    .range-error.show {
+      display: block;
+    }
+
+    .range-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Skeleton Loader */
+    .warc-skeleton {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 4px 0;
+    }
+
+    .skeleton-line {
+      display: flex;
+      align-items: center;
+      height: 18px;
+    }
+
+    .skeleton-num {
+      width: 42px;
+      height: 12px;
+      background: #152232;
+      border-radius: 2px;
+      margin-right: 12px;
+      flex-shrink: 0;
+      animation: warc-pulse 1.4s infinite ease-in-out;
+    }
+
+    .skeleton-bar {
+      height: 12px;
+      background: #192a3e;
+      border-radius: 2px;
+      animation: warc-pulse 1.4s infinite ease-in-out;
+    }
+
+    @keyframes warc-pulse {
+
+      0%,
+      100% {
+        opacity: 0.3;
+      }
+
+      50% {
+        opacity: 0.85;
+      }
     }
 
     /* ── URL Detail Popup ── */
@@ -704,18 +843,28 @@
           <span id="warc-modal-title" class="text-sm font-semibold text-slate-200 font-mono"></span>
         </div>
         <div class="flex items-center gap-3">
-          <label class="text-xs text-slate-400 flex items-center gap-2">
+          <label class="lines-control">
             Lines
-            <select id="modal-lines" onchange="refreshPreview()"
-              class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500">
+            <select id="modal-lines" onchange="handleLineSelection()">
               <option value="50">50</option>
               <option value="100" selected>100</option>
               <option value="250">250</option>
               <option value="500">500</option>
               <option value="1000">1000</option>
+              <option value="range">Range</option>
             </select>
           </label>
-          <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 transition-colors">
+          <div id="range-controls" class="range-controls" style="display: none;">
+            <input id="range-from" type="number" min="1" placeholder="From"
+              onkeydown="if(event.key==='Enter') applyRange()">
+            <input id="range-to" type="number" min="1" placeholder="To"
+              onkeydown="if(event.key==='Enter') applyRange()">
+            <div class="range-wrap">
+              <button type="button" id="range-go" class="legacy-range-apply" onclick="applyRange()">Go</button>
+              <div id="range-error" class="range-error">QUERY RANGE EXCEEDED</div>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 transition-colors ml-1">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
               stroke-linecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -1255,27 +1404,94 @@
     let currentPreviewFile = '';
     let currentPreviewDomain = '';
 
+    function handleLineSelection() {
+      const select = document.getElementById("modal-lines");
+      const range = document.getElementById("range-controls");
+      const error = document.getElementById("range-error");
+      const go = document.getElementById("range-go");
+
+      const isRange = select.value === "range";
+      range.style.display = isRange ? "flex" : "none";
+      if (error) error.classList.remove("show");
+      if (go) go.classList.remove("error");
+
+      if (!isRange) {
+        refreshPreview();
+      }
+    }
+
+    function applyRange() {
+      const fromInput = document.getElementById("range-from");
+      const toInput = document.getElementById("range-to");
+      const error = document.getElementById("range-error");
+      const go = document.getElementById("range-go");
+
+      const from = Number(fromInput.value);
+      const to = Number(toInput.value);
+
+      if (!from || !to || to < from || (to - from) > 2000) {
+        if (error) error.classList.add("show");
+        if (go) go.classList.add("error");
+        return;
+      }
+
+      if (error) error.classList.remove("show");
+      if (go) go.classList.remove("error");
+
+      refreshPreview();
+    }
+
+    function showSkeleton() {
+      const body = document.getElementById('warc-modal-body');
+      const widths = [65, 40, 85, 30, 50, 75, 45, 90, 60, 35, 70, 55, 80, 42, 68, 33, 88, 52, 74, 46];
+      body.innerHTML = `
+        <div class="warc-skeleton">
+          ${widths.map(w => `
+            <div class="skeleton-line">
+              <span class="skeleton-num"></span>
+              <span class="skeleton-bar" style="width: ${w}%"></span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
     async function previewWARC(domainName, filename) {
       closeURLDetail(); // Hide the smaller URL popup to reduce clutter
       currentPreviewFile = filename;
       currentPreviewDomain = domainName;
-      const lines = document.getElementById('modal-lines').value;
       document.getElementById('warc-modal-title').textContent = domainName + '/' + filename;
-      document.getElementById('warc-modal-body').textContent = '';
-      document.getElementById('warc-modal-loading').classList.remove('hidden');
       document.getElementById('warc-modal').classList.add('open');
 
+      showSkeleton();
+
+      const selectVal = document.getElementById('modal-lines').value;
+      let url = `/api/warc-preview?domain=${encodeURIComponent(domainName)}&file=${encodeURIComponent(filename)}`;
+
+      let startLineNum = 1;
+      if (selectVal === 'range') {
+        const fromVal = parseInt(document.getElementById('range-from').value) || 1;
+        const toVal = parseInt(document.getElementById('range-to').value) || (fromVal + 99);
+        startLineNum = fromVal;
+        url += `&from=${fromVal}&to=${toVal}`;
+      } else {
+        url += `&lines=${selectVal}`;
+      }
+
       try {
-        const res = await fetch(`/api/warc-preview?domain=${encodeURIComponent(domainName)}&file=${encodeURIComponent(filename)}&lines=${lines}`);
+        const res = await fetch(url);
         const text = await res.text();
-        document.getElementById('warc-modal-loading').classList.add('hidden');
+        const headerStart = parseInt(res.headers.get('X-Start-Line'));
+        if (!isNaN(headerStart)) {
+          startLineNum = headerStart;
+        }
+
         const body = document.getElementById('warc-modal-body');
         const lineArr = text.split('\n');
         body.innerHTML = lineArr.map((line, i) =>
-          `<span class="ln">${i + 1}</span>${escapeHtml(line)}`
+          `<span class="ln">${startLineNum + i}</span>${escapeHtml(line)}`
         ).join('\n');
       } catch (err) {
-        document.getElementById('warc-modal-loading').classList.add('hidden');
         document.getElementById('warc-modal-body').textContent = 'Error: ' + err.message;
       }
     }
@@ -1287,6 +1503,10 @@
     function closeModal(e) {
       if (e && e.target !== document.getElementById('warc-modal')) return;
       document.getElementById('warc-modal').classList.remove('open');
+      const error = document.getElementById("range-error");
+      const go = document.getElementById("range-go");
+      if (error) error.classList.remove("show");
+      if (go) go.classList.remove("error");
     }
 
     function escapeHtml(str) {

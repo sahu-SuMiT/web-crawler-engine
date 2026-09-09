@@ -237,9 +237,24 @@ func (s *Server) Start() error {
 			return
 		}
 
+		startLine := 1
+		if fVal, err := strconv.Atoi(r.URL.Query().Get("from")); err == nil && fVal > 0 {
+			startLine = fVal
+		}
+
 		nLines := 100
 		if n, err := strconv.Atoi(r.URL.Query().Get("lines")); err == nil && n > 0 && n <= 2000 {
 			nLines = n
+		}
+
+		endLine := startLine + nLines - 1
+		if tVal, err := strconv.Atoi(r.URL.Query().Get("to")); err == nil && tVal >= startLine {
+			endLine = tVal
+		}
+
+		// Cap total requested lines to max difference of 2000
+		if endLine-startLine > 2000 {
+			endLine = startLine + 2000
 		}
 
 		var filePath string
@@ -262,12 +277,20 @@ func (s *Server) Start() error {
 		}
 		defer gr.Close()
 
+		w.Header().Set("X-Start-Line", strconv.Itoa(startLine))
+
 		scanner := bufio.NewScanner(gr)
 		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-		count := 0
-		for scanner.Scan() && count < nLines {
+		currentLine := 0
+		for scanner.Scan() {
+			currentLine++
+			if currentLine < startLine {
+				continue
+			}
+			if currentLine > endLine {
+				break
+			}
 			fmt.Fprintln(w, scanner.Text())
-			count++
 		}
 	})
 
